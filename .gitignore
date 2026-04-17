@@ -1,0 +1,21 @@
+# Build
+target/
+*.class
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# 민감정보
+application.yml
+application-*.yml
+application.properties
+*.env
+
+# Logs
+*.log
+
+# Claude Code
+.claude/

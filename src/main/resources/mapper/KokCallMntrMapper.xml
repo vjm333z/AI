@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ragtest.repository.KokCallMntrMapper">
+
+    <select id="selectAll" resultType="com.ragtest.dto.KokCallMntrDto">
+        SELECT
+            SEQ_NO      as seqNo,
+            PROP_CD     as propCd,
+            TITLE       as title,
+            REPORT      as report,
+            RACTION     as raction,
+            FEEDBACK    as feedback,
+            FEEDBACK_YN as feedbackYn,
+            DATE_FORMAT(R_DT, '%Y-%m-%d') as rDt
+        FROM KOK_CALL_MNTR
+        WHERE REPORT IS NOT NULL
+        AND TRIM(REPORT) != ''
+        AND FEEDBACK IS NOT NULL
+        AND TRIM(FEEDBACK) != ''
+        AND '2025-01-01' > R_DT
+        ORDER BY R_DT DESC
+--         LIMIT 5000
+--         LIMIT 100
+    </select>
+
+    <select id="selectAfter" resultType="com.ragtest.dto.KokCallMntrDto">
+        SELECT
+            SEQ_NO as seqNo, PROP_CD as propCd, TITLE as title,
+            REPORT as report, RACTION as raction, FEEDBACK as feedback,
+            FEEDBACK_YN as feedbackYn, DATE_FORMAT(R_DT, '%Y-%m-%d') as rDt
+        FROM KOK_CALL_MNTR
+        WHERE REPORT IS NOT NULL
+          AND TRIM(REPORT) != ''
+      AND FEEDBACK IS NOT NULL
+      AND TRIM(FEEDBACK) != ''
+      AND R_DT > #{lastSyncDt}
+        ORDER BY R_DT ASC
+    </select>
+</mapper>
