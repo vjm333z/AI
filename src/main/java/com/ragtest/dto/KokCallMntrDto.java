@@ -34,20 +34,39 @@ public class KokCallMntrDto {
     public String getRDt() { return rDt; }
     public void setRDt(String rDt) { this.rDt = rDt; }
 
-    // 임베딩용 텍스트 조합
+    /**
+     * 임베딩용 텍스트 (Q-Q 매칭).
+     * TITLE + REPORT를 정제해서 합친다. FEEDBACK은 제외.
+     */
     public String toEmbeddingText() {
         StringBuilder sb = new StringBuilder();
-        if (report != null) {
-            String cleanReport = report
-                    .replaceAll("<[^>]*>", " ")  // HTML 태그 제거
-                    .replaceAll("\\s+", " ")      // 연속 공백 제거
-                    .trim();
-            sb.append("문의내용: ").append(cleanReport).append(" ");
-        }
-        if (feedback != null) {
-            String cleanFeedback = feedback.trim();
-            sb.append("답변: ").append(cleanFeedback);
-        }
+        String t = cleanTruncate(title, 100);
+        String r = cleanTruncate(report, 1000);
+        if (!t.isEmpty()) sb.append(t).append(" ");
+        if (!r.isEmpty()) sb.append(r);
         return sb.toString().trim();
+    }
+
+    /** 저장·표시용 정제 (길이 제한 없음) — HTML 태그 + 엔티티 + 연속 공백 정리 */
+    public static String cleanDisplay(String raw) {
+        if (raw == null) return "";
+        return raw
+                .replaceAll("<[^>]*>", " ")
+                .replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'")
+                .replace("&apos;", "'")
+                .replaceAll("&#\\d+;", "")    // 기타 숫자 엔티티 제거
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    /** 임베딩용 정제 — cleanDisplay + 길이 제한 */
+    private static String cleanTruncate(String raw, int maxLen) {
+        String s = cleanDisplay(raw);
+        return s.length() > maxLen ? s.substring(0, maxLen) : s;
     }
 }

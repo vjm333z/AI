@@ -19,6 +19,7 @@
         AND TRIM(REPORT) != ''
         AND FEEDBACK IS NOT NULL
         AND TRIM(FEEDBACK) != ''
+        AND FEEDBACK_YN = 'Y'
         AND '2025-01-01' > R_DT
         ORDER BY R_DT DESC
 --         LIMIT 5000
@@ -35,6 +36,7 @@
           AND TRIM(REPORT) != ''
       AND FEEDBACK IS NOT NULL
       AND TRIM(FEEDBACK) != ''
+      AND FEEDBACK_YN = 'Y'
       AND R_DT > #{lastSyncDt}
         ORDER BY R_DT ASC
     </select>
