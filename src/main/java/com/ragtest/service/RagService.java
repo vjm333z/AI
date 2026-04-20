@@ -79,6 +79,15 @@ public class RagService {
     @Value("${rag.reranker.min-score:0.0}")
     private double rerankMinScore;
 
+    @Value("${rag.dedup.enabled:false}")
+    private boolean dedupEnabled;
+
+    @Value("${rag.dedup.jaccard-threshold:0.7}")
+    private double dedupJaccardThreshold;
+
+    @Value("${rag.dedup.lambda:0.7}")
+    private double dedupLambda;
+
     @Value("${rag.query-rewrite.enabled:false}")
     private boolean queryRewriteEnabled;
 
@@ -132,6 +141,96 @@ public class RagService {
      * 각 레코드마다 TemplatizeService(provider 설정 기반) → core_question+situation 임베딩 → HyDE 필드 payload 포함.
      * Groq rate limit 고려해 호출 사이 짧게 sleep.
      */
+    // ============================================================
+    // MMR (Maximal Marginal Relevance) — 다양성 재정렬
+    //   Top 1은 rerank 최고점 그대로, 나머지는 "관련성 × λ - 기존 선택과의 최대 유사도 × (1-λ)"로 선택.
+    //   텍스트 Jaccard 유사도 기반 (벡터 재계산 불필요, 빠름).
+    //   MMR로 밀려난 유사 사례 수는 payload에 similar_count로 기록 → UI에서 "비슷한 N건 더" 힌트 가능.
+    // ============================================================
+    private List<Map<String, Object>> applyMMR(List<Map<String, Object>> candidates, int topK) {
+        if (!dedupEnabled || candidates == null || candidates.size() <= topK) {
+            return candidates == null ? new ArrayList<>()
+                    : candidates.stream().limit(topK).collect(Collectors.toList());
+        }
+        List<Map<String, Object>> remaining = new ArrayList<>(candidates);
+        List<Map<String, Object>> selected = new ArrayList<>();
+
+        // 1순위: rerank 최고점 그대로 (답 놓치지 않기 위한 안전장치)
+        selected.add(remaining.remove(0));
+
+        // 2순위 이후: MMR 점수로 선택
+        while (selected.size() < topK && !remaining.isEmpty()) {
+            double bestScore = Double.NEGATIVE_INFINITY;
+            int bestIdx = -1;
+            for (int i = 0; i < remaining.size(); i++) {
+                Map<String, Object> cand = remaining.get(i);
+                double relevance = getMmrRelevance(cand);
+                double maxSim = 0.0;
+                String candText = getMmrText(cand);
+                for (Map<String, Object> sel : selected) {
+                    double sim = jaccardSimilarity(candText, getMmrText(sel));
+                    if (sim > maxSim) maxSim = sim;
+                }
+                double mmrScore = dedupLambda * relevance - (1 - dedupLambda) * maxSim;
+                if (mmrScore > bestScore) { bestScore = mmrScore; bestIdx = i; }
+            }
+            if (bestIdx < 0) break;
+            selected.add(remaining.remove(bestIdx));
+        }
+
+        // 남은 후보 중 selected와 매우 유사한(임계값 초과) 건수 카운트 → similar_count 메타
+        for (Map<String, Object> sel : selected) {
+            String selText = getMmrText(sel);
+            int cnt = 0;
+            for (Map<String, Object> rem : remaining) {
+                if (jaccardSimilarity(selText, getMmrText(rem)) >= dedupJaccardThreshold) cnt++;
+            }
+            sel.put("similar_count", cnt);
+        }
+        return selected;
+    }
+
+    private double getMmrRelevance(Map<String, Object> c) {
+        Object rs = c.get("rerank_score");
+        if (rs instanceof Number) return ((Number) rs).doubleValue();
+        Object s = c.get("score");
+        return s instanceof Number ? ((Number) s).doubleValue() : 0.0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String getMmrText(Map<String, Object> c) {
+        Map<String, Object> payload = (Map<String, Object>) c.get("payload");
+        if (payload == null) return "";
+        // HyDE 컬렉션이면 core_question+situation (짧고 정제됨) 우선, 아니면 report
+        Object cq = payload.get("core_question");
+        if (cq != null && !String.valueOf(cq).trim().isEmpty()) {
+            return String.valueOf(cq) + " " + String.valueOf(payload.getOrDefault("situation", ""));
+        }
+        Object rep = payload.get("report");
+        return rep != null ? String.valueOf(rep) : "";
+    }
+
+    private double jaccardSimilarity(String a, String b) {
+        Set<String> ta = tokenize(a);
+        Set<String> tb = tokenize(b);
+        if (ta.isEmpty() || tb.isEmpty()) return 0.0;
+        Set<String> inter = new HashSet<>(ta);
+        inter.retainAll(tb);
+        int unionSize = ta.size() + tb.size() - inter.size();
+        return unionSize == 0 ? 0.0 : (double) inter.size() / unionSize;
+    }
+
+    private static final Pattern TOKENIZE_SPLIT = Pattern.compile("[^가-힣a-zA-Z0-9]+");
+
+    private Set<String> tokenize(String s) {
+        if (s == null || s.isEmpty()) return Collections.emptySet();
+        Set<String> tokens = new HashSet<>();
+        for (String t : TOKENIZE_SPLIT.split(s.toLowerCase())) {
+            if (t.length() >= 2) tokens.add(t);   // 1글자 토큰 제외 (노이즈)
+        }
+        return tokens;
+    }
+
     /** rag.templatize.provider 설정값에 따라 알맞은 TemplatizeService 선택. */
     private TemplatizeService resolveTemplatizer() {
         TemplatizeService svc = templatizers.get(templatizeProvider);
@@ -346,32 +445,30 @@ public class RagService {
             log.info("---");
         }
 
-        // 5. (옵션) Reranker로 재정렬 — 원본 질문 기준 (확장 쿼리 아님)
-        //    + rerank_score가 min-score 미만이면 제외
-        //    ("방구냄새" 같이 도메인 밖 질문이 Query Rewrite로 왜곡돼 뽑힌 무관 사례 차단)
+        // 5. (옵션) Reranker로 재정렬 — 원본 질문 기준, rerank_score < min-score 제외
+        //    + (옵션) MMR로 다양성 재정렬 — Top 1 유지, 나머지만 다양성 가중치로 선택
         List<Map<String, Object>> finalCases;
         if (rerankerEnabled && !filteredCases.isEmpty()) {
             try {
-                List<Map<String, Object>> reranked = rerankerService.rerank(question, filteredCases, finalTopK);
-                finalCases = reranked.stream()
+                // MMR을 위해 전체 rerank 받기 (기존 finalTopK만 → 전체로 확장)
+                int rerankTopK = dedupEnabled ? filteredCases.size() : finalTopK;
+                List<Map<String, Object>> reranked = rerankerService.rerank(question, filteredCases, rerankTopK);
+                List<Map<String, Object>> afterMin = reranked.stream()
                         .filter(c -> {
                             Object rs = c.get("rerank_score");
                             return rs instanceof Number && ((Number) rs).doubleValue() >= rerankMinScore;
                         })
                         .collect(Collectors.toList());
-                log.info("Reranker 적용 후 {}건 → min-score({}) 컷 후 {}건",
-                        reranked.size(), rerankMinScore, finalCases.size());
-                for (Map<String, Object> c : finalCases) {
-                    log.info("rerank_score: {}, seq_no: {}",
-                            c.get("rerank_score"),
-                            ((Map<String, Object>) c.get("payload")).get("seq_no"));
-                }
+                finalCases = applyMMR(afterMin, finalTopK);
+                log.info("Rerank {}건 → min-score({}) 컷 {}건 → MMR({}) 최종 {}건",
+                        reranked.size(), rerankMinScore, afterMin.size(),
+                        dedupEnabled ? "ON" : "OFF", finalCases.size());
             } catch (Exception e) {
                 log.warn("Reranker 호출 실패, Qdrant 순위로 폴백: {}", e.getMessage());
-                finalCases = filteredCases.stream().limit(finalTopK).collect(Collectors.toList());
+                finalCases = applyMMR(filteredCases, finalTopK);
             }
         } else {
-            finalCases = filteredCases.stream().limit(finalTopK).collect(Collectors.toList());
+            finalCases = applyMMR(filteredCases, finalTopK);
         }
 
         // 6. Groq LLM으로 답변 생성 — 원본 질문 전달 (확장 쿼리 아님)
@@ -411,12 +508,20 @@ public class RagService {
         List<Map<String, Object>> finalCases;
         if (rerankerEnabled && !filteredCases.isEmpty()) {
             try {
-                finalCases = rerankerService.rerank(question, filteredCases, finalTopK);
+                int rerankTopK = dedupEnabled ? filteredCases.size() : finalTopK;
+                List<Map<String, Object>> reranked = rerankerService.rerank(question, filteredCases, rerankTopK);
+                List<Map<String, Object>> afterMin = reranked.stream()
+                        .filter(c -> {
+                            Object rs = c.get("rerank_score");
+                            return rs instanceof Number && ((Number) rs).doubleValue() >= rerankMinScore;
+                        })
+                        .collect(Collectors.toList());
+                finalCases = applyMMR(afterMin, finalTopK);
             } catch (Exception e) {
-                finalCases = filteredCases.stream().limit(finalTopK).collect(Collectors.toList());
+                finalCases = applyMMR(filteredCases, finalTopK);
             }
         } else {
-            finalCases = filteredCases.stream().limit(finalTopK).collect(Collectors.toList());
+            finalCases = applyMMR(filteredCases, finalTopK);
         }
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -497,6 +602,10 @@ public class RagService {
             s.put("score", c.get("score"));
             if (c.containsKey("rerank_score")) {
                 s.put("rerank_score", c.get("rerank_score"));
+            }
+            // MMR로 밀려난 유사 사례 수 (UI에 "비슷한 N건 더" 배지 노출용)
+            if (c.containsKey("similar_count")) {
+                s.put("similar_count", c.get("similar_count"));
             }
             sources.add(s);
         }
