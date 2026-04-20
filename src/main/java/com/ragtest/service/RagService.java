@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -58,6 +59,9 @@ public class RagService {
 
     @Value("${rag.reranker.enabled:false}")
     private boolean rerankerEnabled;
+
+    @Value("${rag.reranker.min-score:0.0}")
+    private double rerankMinScore;
 
     @Value("${rag.query-rewrite.enabled:false}")
     private boolean queryRewriteEnabled;
@@ -134,11 +138,20 @@ public class RagService {
         }
 
         // 5. (옵션) Reranker로 재정렬 — 원본 질문 기준 (확장 쿼리 아님)
+        //    + rerank_score가 min-score 미만이면 제외
+        //    ("방구냄새" 같이 도메인 밖 질문이 Query Rewrite로 왜곡돼 뽑힌 무관 사례 차단)
         List<Map<String, Object>> finalCases;
         if (rerankerEnabled && !filteredCases.isEmpty()) {
             try {
-                finalCases = rerankerService.rerank(question, filteredCases, finalTopK);
-                log.info("Reranker 적용 후 최종 {}건", finalCases.size());
+                List<Map<String, Object>> reranked = rerankerService.rerank(question, filteredCases, finalTopK);
+                finalCases = reranked.stream()
+                        .filter(c -> {
+                            Object rs = c.get("rerank_score");
+                            return rs instanceof Number && ((Number) rs).doubleValue() >= rerankMinScore;
+                        })
+                        .collect(Collectors.toList());
+                log.info("Reranker 적용 후 {}건 → min-score({}) 컷 후 {}건",
+                        reranked.size(), rerankMinScore, finalCases.size());
                 for (Map<String, Object> c : finalCases) {
                     log.info("rerank_score: {}, seq_no: {}",
                             c.get("rerank_score"),
@@ -193,6 +206,52 @@ public class RagService {
         return response;
     }
 
+    /**
+     * Qdrant 적재 데이터에서 랜덤 샘플 추출 → Groq로 카테고리 체계 제안.
+     * 사외(DB 접근 불가) 환경에서도 돌아가도록 MariaDB 아닌 Qdrant payload를 소스로 사용.
+     */
+    public Map<String, Object> analyzeCategories(int sampleSize) throws Exception {
+        List<Map<String, Object>> all = qdrantService.scrollAllPayloads();
+        if (all.isEmpty()) {
+            Map<String, Object> empty = new LinkedHashMap<>();
+            empty.put("total_in_qdrant", 0);
+            empty.put("sample_size", 0);
+            empty.put("analysis", "{\"error\": \"Qdrant에 적재된 데이터가 없습니다.\"}");
+            return empty;
+        }
+
+        Collections.shuffle(all);
+        int n = Math.min(sampleSize, all.size());
+        List<Map<String, Object>> samples = all.subList(0, n);
+
+        List<Map<String, String>> samplePayloads = new ArrayList<>();
+        List<Long> sampleIds = new ArrayList<>();
+        for (Map<String, Object> point : samples) {
+            Map<String, Object> payload = (Map<String, Object>) point.get("payload");
+            String title = payload.get("title") != null ? String.valueOf(payload.get("title")) : "";
+            String report = payload.get("report") != null ? String.valueOf(payload.get("report")) : "";
+            if (title.length() > 100) title = title.substring(0, 100);
+            if (report.length() > 500) report = report.substring(0, 500);
+
+            Map<String, String> s = new LinkedHashMap<>();
+            s.put("title", title);
+            s.put("report", report);
+            samplePayloads.add(s);
+            Object id = point.get("id");
+            if (id instanceof Number) sampleIds.add(((Number) id).longValue());
+        }
+
+        log.info("카테고리 분석 시작: 전체 {}건 중 {}건 샘플링", all.size(), n);
+        String analysis = groqService.proposeCategories(samplePayloads);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total_in_qdrant", all.size());
+        result.put("sample_size", n);
+        result.put("sample_ids", sampleIds);
+        result.put("analysis", analysis);
+        return result;
+    }
+
     private List<Map<String, Object>> toSources(List<Map<String, Object>> cases) {
         List<Map<String, Object>> sources = new ArrayList<>();
         for (Map<String, Object> c : cases) {
@@ -200,7 +259,7 @@ public class RagService {
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("seq_no", payload.get("seq_no"));
             s.put("prop_cd", payload.get("prop_cd"));
-            s.put("title", payload.get("title"));
+            // title 제거 (2026-04-20) — 실데이터 미사용 확인 후 payload에서 완전히 제거
             s.put("report", payload.get("report"));
             s.put("feedback", payload.get("feedback"));
             s.put("score", c.get("score"));

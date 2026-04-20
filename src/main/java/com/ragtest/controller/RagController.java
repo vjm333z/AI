@@ -120,6 +120,37 @@ public class RagController {
         return result;
     }
 
+    /**
+     * Qdrant 적재분에서 랜덤 샘플링 → Groq에 "이 문의들 어떻게 분류될까" 던져 카테고리 체계 제안받기.
+     * 요청 바디(옵션): {"sampleSize": 150}  — 범위 10~300, 기본 150
+     */
+    @PostMapping("/analyze-categories")
+    public Map<String, Object> analyzeCategories(@RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> result = new HashMap<>();
+        long started = System.currentTimeMillis();
+        try {
+            int sampleSize = 150;
+            if (body != null && body.get("sampleSize") != null) {
+                Object v = body.get("sampleSize");
+                if (v instanceof Number) sampleSize = ((Number) v).intValue();
+                else sampleSize = Integer.parseInt(v.toString().trim());
+            }
+            if (sampleSize < 10) sampleSize = 10;
+            if (sampleSize > 300) sampleSize = 300;
+
+            Map<String, Object> r = ragService.analyzeCategories(sampleSize);
+            result.put("success", true);
+            result.putAll(r);
+            result.put("elapsed_ms", System.currentTimeMillis() - started);
+        } catch (Exception e) {
+            log.error("카테고리 분석 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+            result.put("elapsed_ms", System.currentTimeMillis() - started);
+        }
+        return result;
+    }
+
     @PostMapping("/index/updated")
     public Map<String, Object> indexUpdated() {
         Map<String, Object> result = new HashMap<>();

@@ -36,15 +36,12 @@ public class KokCallMntrDto {
 
     /**
      * 임베딩용 텍스트 (Q-Q 매칭).
-     * TITLE + REPORT를 정제해서 합친다. FEEDBACK은 제외.
+     * REPORT만 정제해서 사용. TITLE은 payload에는 저장하지만 임베딩엔 포함하지 않음
+     * (운영 관찰 결과 TITLE이 검색에 도움 안 됨, 오히려 노이즈가 될 수 있어서 제외).
+     * FEEDBACK도 임베딩 제외 (답변은 검색 대상이 아님).
      */
     public String toEmbeddingText() {
-        StringBuilder sb = new StringBuilder();
-        String t = cleanTruncate(title, 100);
-        String r = cleanTruncate(report, 1000);
-        if (!t.isEmpty()) sb.append(t).append(" ");
-        if (!r.isEmpty()) sb.append(r);
-        return sb.toString().trim();
+        return cleanTruncate(report, 1000);
     }
 
     /** 저장·표시용 정제 (길이 제한 없음) — HTML 태그 + 엔티티 + 연속 공백 정리 */

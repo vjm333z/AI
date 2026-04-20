@@ -101,7 +101,8 @@ public class QdrantService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("seq_no", dto.getSeqNo());
         payload.put("prop_cd", dto.getPropCd());
-        payload.put("title", KokCallMntrDto.cleanDisplay(dto.getTitle()));
+        // TITLE은 최근 운영 데이터에서 실제로 거의 안 쓰이고 "(제목 없음)" 케이스가 많아
+        // 임베딩·payload 양쪽에서 완전히 제거 (2026-04-20 결정)
         payload.put("report", KokCallMntrDto.cleanDisplay(dto.getReport()));
         payload.put("feedback", KokCallMntrDto.cleanDisplay(dto.getFeedback()));
 
@@ -129,6 +130,60 @@ public class QdrantService {
             }
             log.debug("Qdrant upsert response: {}", responseBody);
         }
+    }
+
+    /**
+     * 컬렉션 전체 payload 스크롤 (카테고리 분석·디버그용).
+     * 3천 건 규모 가정. 수만 건 이상이면 페이징·샘플링 전략 재검토 필요.
+     */
+    public List<Map<String, Object>> scrollAllPayloads() throws Exception {
+        List<Map<String, Object>> all = new ArrayList<>();
+        Object offset = null;
+        int batchSize = 1000;
+
+        while (true) {
+            HttpPost post = new HttpPost(qdrantUrl + "/collections/" + collection + "/points/scroll");
+            post.setHeader("Content-Type", "application/json");
+            post.setHeader("Accept", "application/json");
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("limit", batchSize);
+            body.put("with_payload", true);
+            body.put("with_vector", false);
+            if (offset != null) body.put("offset", offset);
+
+            byte[] jsonBytes = objectMapper.writeValueAsBytes(body);
+            ByteArrayEntity entity = new ByteArrayEntity(jsonBytes);
+            entity.setContentType("application/json; charset=utf-8");
+            post.setEntity(entity);
+
+            try (CloseableHttpClient client = HttpClients.createDefault();
+                 CloseableHttpResponse response = client.execute(post)) {
+                String responseBody = EntityUtils.toString(response.getEntity(), "UTF-8");
+                int status = response.getStatusLine().getStatusCode();
+                if (status < 200 || status >= 300) {
+                    throw new RuntimeException("Qdrant scroll 실패 status=" + status + " body=" + responseBody);
+                }
+                JsonNode root = objectMapper.readTree(responseBody);
+                JsonNode result = root.get("result");
+                JsonNode points = result != null ? result.get("points") : null;
+
+                if (points != null) {
+                    for (JsonNode point : points) {
+                        Map<String, Object> p = new HashMap<>();
+                        p.put("id", point.get("id").asLong());
+                        p.put("payload", objectMapper.convertValue(point.get("payload"), Map.class));
+                        all.add(p);
+                    }
+                }
+
+                JsonNode nextOffset = result != null ? result.get("next_page_offset") : null;
+                if (nextOffset == null || nextOffset.isNull()) break;
+                offset = objectMapper.convertValue(nextOffset, Object.class);
+            }
+        }
+        log.info("Qdrant scroll 완료: 총 {}건", all.size());
+        return all;
     }
 
     // 유사 벡터 검색 (propCd null이면 필터 없음)
