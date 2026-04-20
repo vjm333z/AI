@@ -16,11 +16,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -47,6 +49,20 @@ public class RagService {
 
     @Autowired
     private QueryRewriteService queryRewriteService;
+
+    @Autowired
+    private IndexFailureTracker failureTracker;
+
+    /**
+     * 등록된 모든 TemplatizeService 구현체.
+     * Spring이 bean name → 구현체 Map으로 자동 주입 (예: "groq" → GroqService).
+     * resolveTemplatizer()에서 provider 설정값으로 골라 씀.
+     */
+    @Autowired
+    private Map<String, TemplatizeService> templatizers;
+
+    @Value("${rag.templatize.provider:groq}")
+    private String templatizeProvider;
 
     @Value("${rag.search.top-k:10}")
     private int searchTopK;
@@ -99,6 +115,8 @@ public class RagService {
                     fail++;
                     log.warn("Index 실패 seq_no={}, text_len={}, cause={}",
                             dto.getSeqNo(), text.length(), e.getMessage());
+                    // 파일 장부에 기록 — 추후 /retry-failed로 재시도 가능
+                    failureTracker.record(dto.getSeqNo(), e.getMessage());
                 }
             }
 
@@ -109,9 +127,200 @@ public class RagService {
         }
     }
 
+    /**
+     * HyDE 하이브리드 템플릿 적재 — inquiry_templated 컬렉션으로.
+     * 각 레코드마다 TemplatizeService(provider 설정 기반) → core_question+situation 임베딩 → HyDE 필드 payload 포함.
+     * Groq rate limit 고려해 호출 사이 짧게 sleep.
+     */
+    /** rag.templatize.provider 설정값에 따라 알맞은 TemplatizeService 선택. */
+    private TemplatizeService resolveTemplatizer() {
+        TemplatizeService svc = templatizers.get(templatizeProvider);
+        if (svc == null) {
+            throw new IllegalStateException(
+                    "Unknown templatize provider='" + templatizeProvider + "'. 사용 가능: " + templatizers.keySet());
+        }
+        return svc;
+    }
+
+    public String indexAllTemplated() throws Exception {
+        if (!indexing.compareAndSet(false, true)) {
+            log.warn("indexAllTemplated 호출됐지만 이미 다른 적재 작업이 진행 중");
+            return "이미 적재 작업이 진행 중입니다";
+        }
+        try {
+            TemplatizeService templatizer = resolveTemplatizer();
+            String collectionName = qdrantService.getTemplatedCollection();
+            // 이미 적재된 seq_no는 스킵 (중복 LLM 호출 방지 — 토큰 절약)
+            Set<Integer> existingSeqs = qdrantService.collectSeqNos(collectionName);
+            log.info("Templated 시작: provider={}, collection={}, 기존 {}건 skip 대상",
+                    templatizer.providerName(), collectionName, existingSeqs.size());
+
+            List<KokCallMntrDto> list = mapper.selectAll();
+            int ok = 0, skipEmpty = 0, skipExisting = 0, failLlm = 0, failUpsert = 0;
+            int consecutiveFails = 0;
+            final int CONSECUTIVE_FAIL_LIMIT = 10;  // 연속 실패 → 외부 API 한도 추정 → 조기 중단
+
+            for (KokCallMntrDto dto : list) {
+                if (existingSeqs.contains(dto.getSeqNo())) {
+                    skipExisting++;
+                    continue;
+                }
+                String rawReport = dto.getReport();
+                if (rawReport == null || rawReport.trim().isEmpty()) {
+                    skipEmpty++;
+                    continue;
+                }
+                // 1) 선택된 provider로 HyDE 추출
+                Map<String, Object> hyde = templatizer.templatize(rawReport, dto.getFeedback());
+                if (hyde == null) {
+                    failLlm++;
+                    consecutiveFails++;
+                    failureTracker.record(dto.getSeqNo(), "templated: " + templatizer.providerName() + " templatize 실패");
+                    if (consecutiveFails >= CONSECUTIVE_FAIL_LIMIT) {
+                        log.warn("연속 {}건 LLM 실패 → 외부 API 한도 가능성, 조기 중단. (성공 {} / 전체 예정 {})",
+                                consecutiveFails, ok, list.size() - existingSeqs.size());
+                        break;
+                    }
+                    continue;
+                }
+                consecutiveFails = 0;  // 성공 한 번 나오면 카운터 초기화
+
+                String coreQ = String.valueOf(hyde.getOrDefault("core_question", "")).trim();
+                String situation = String.valueOf(hyde.getOrDefault("situation", "")).trim();
+                String embText = (coreQ + " " + situation).trim();
+                if (embText.isEmpty()) {
+                    skipEmpty++;
+                    failureTracker.record(dto.getSeqNo(), "templated: 빈 core_question+situation");
+                    continue;
+                }
+                // 2) 임베딩 + 3) Qdrant upsert (HyDE 필드 payload 포함)
+                try {
+                    List<Double> vector = ollamaService.embed(embText);
+                    qdrantService.upsertTo(collectionName, dto.getSeqNo(), vector, dto, hyde);
+                    ok++;
+                    // 성공 시 실패 장부에서 제거 (재시도 성공 케이스)
+                    failureTracker.removeSuccessful(Collections.singleton(dto.getSeqNo()));
+                    if (ok % 50 == 0) {
+                        log.info("Templated [{}/{}] seq_no={} (LLM실패 {}, Upsert실패 {})",
+                                ok, list.size(), dto.getSeqNo(), failLlm, failUpsert);
+                    }
+                } catch (Exception e) {
+                    failUpsert++;
+                    log.warn("Templated upsert 실패 seq_no={}, cause={}", dto.getSeqNo(), e.getMessage());
+                    failureTracker.record(dto.getSeqNo(), "templated: " + e.getMessage());
+                }
+                // Groq rate limit 여유 (무료 tier 기준): 호출 사이 50ms 대기
+                try { Thread.sleep(50); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            }
+
+            log.info("Templated Index 완료: 성공={}, LLM실패={}, Upsert실패={}, 빈본문={}, 기존스킵={}",
+                    ok, failLlm, failUpsert, skipEmpty, skipExisting);
+            return String.format("템플릿 적재 완료: 신규성공 %d건, LLM실패 %d건, Upsert실패 %d건, 빈본문 %d건, 기존스킵 %d건",
+                    ok, failLlm, failUpsert, skipEmpty, skipExisting);
+        } finally {
+            indexing.set(false);
+        }
+    }
+
+    /**
+     * failed_index.txt에 쌓인 실패 seq_no들을 DB에서 재조회해 다시 적재.
+     * 성공한 건은 장부에서 제거. 실패하면 같은 줄이 또 append돼서 최신 reason으로 갱신됨.
+     */
+    public Map<String, Object> retryFailed() throws Exception {
+        if (!indexing.compareAndSet(false, true)) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("success", false);
+            r.put("message", "이미 다른 적재 작업이 진행 중");
+            return r;
+        }
+        try {
+            Set<Integer> pendingSeqs = failureTracker.distinctSeqNos();
+            if (pendingSeqs.isEmpty()) {
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("success", true);
+                r.put("message", "재시도할 실패 건이 없습니다");
+                r.put("retried", 0);
+                return r;
+            }
+
+            // DB에서 해당 seq_no들 원본 재조회 (동일 필터 유지)
+            List<KokCallMntrDto> rows = mapper.selectBySeqNos(pendingSeqs);
+            Set<Integer> foundSeqs = rows.stream().map(KokCallMntrDto::getSeqNo).collect(Collectors.toSet());
+            Set<Integer> missingSeqs = new HashSet<>(pendingSeqs);
+            missingSeqs.removeAll(foundSeqs);
+            // DB에서 더 이상 조건 안 맞는 건들(FEEDBACK_YN 바뀜 등)은 장부에서 제거 — 영구 제외
+            if (!missingSeqs.isEmpty()) {
+                log.info("재시도 대상에서 사라진 seq_no {}건 — 장부 정리: {}",
+                        missingSeqs.size(), missingSeqs);
+                failureTracker.removeSuccessful(missingSeqs);
+            }
+
+            int ok = 0, fail = 0, skipEmpty = 0;
+            Set<Integer> successSeqs = new HashSet<>();
+            for (KokCallMntrDto dto : rows) {
+                String text = dto.toEmbeddingText();
+                if (text.isEmpty()) {
+                    skipEmpty++;
+                    continue;
+                }
+                try {
+                    List<Double> vector = ollamaService.embed(text);
+                    qdrantService.upsert(dto.getSeqNo(), vector, dto);
+                    ok++;
+                    successSeqs.add(dto.getSeqNo());
+                    log.info("Retry OK seq_no={}", dto.getSeqNo());
+                } catch (Exception e) {
+                    fail++;
+                    log.warn("Retry 실패 seq_no={}, cause={}", dto.getSeqNo(), e.getMessage());
+                    failureTracker.record(dto.getSeqNo(), "retry: " + e.getMessage());
+                }
+            }
+            failureTracker.removeSuccessful(successSeqs);
+
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("success", true);
+            r.put("pending_before", pendingSeqs.size());
+            r.put("retried", rows.size());
+            r.put("ok", ok);
+            r.put("fail", fail);
+            r.put("skip_empty", skipEmpty);
+            r.put("removed_missing", missingSeqs.size());
+            r.put("pending_after", failureTracker.distinctSeqNos().size());
+            log.info("재시도 완료: {}", r);
+            return r;
+        } finally {
+            indexing.set(false);
+        }
+    }
+
+    public Map<String, Object> failedSummary() {
+        List<Map<String, Object>> all = failureTracker.readAll();
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("total", all.size());
+        r.put("distinct", failureTracker.distinctSeqNos().size());
+        r.put("samples", all.stream().limit(10).collect(Collectors.toList()));
+        // 사유별 집계 (상위 10종)
+        Map<String, Long> byReason = all.stream()
+                .collect(Collectors.groupingBy(
+                        e -> String.valueOf(e.getOrDefault("reason", "")),
+                        Collectors.counting()));
+        r.put("reason_counts", byReason.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(10)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (a, b) -> a, LinkedHashMap::new)));
+        return r;
+    }
+
     // 질문 → (선택) Query Rewrite → 유사 사례 검색 → (선택) Reranker → Groq 답변
-    // propCd는 null/빈 문자열이면 필터 없음
+    // propCd는 null/빈 문자열이면 필터 없음. mode는 null/"default" 또는 "templated" (A/B 컬렉션 분기).
     public Map<String, Object> ask(String question, String propCd) throws Exception {
+        return ask(question, propCd, null);
+    }
+
+    public Map<String, Object> ask(String question, String propCd, String mode) throws Exception {
+        String collectionName = resolveCollection(mode);
+
         // 1. (옵션) 질문 확장 — 검색 품질 향상
         String searchQuery = queryRewriteEnabled ? queryRewriteService.rewrite(question) : question;
 
@@ -120,7 +329,7 @@ public class RagService {
 
         // 3. Qdrant에서 Top N 검색 (reranker가 있으면 넉넉히, 없으면 finalTopK만)
         int fetchK = rerankerEnabled ? searchTopK : finalTopK;
-        List<Map<String, Object>> similarCases = qdrantService.search(queryVector, fetchK, propCd);
+        List<Map<String, Object>> similarCases = qdrantService.searchIn(collectionName, queryVector, fetchK, propCd);
 
         // 4. 유사도 점수 필터
         List<Map<String, Object>> filteredCases = similarCases.stream()
@@ -176,12 +385,25 @@ public class RagService {
         return response;
     }
 
-    /** 디버그·튜닝용: LLM 거치지 않고 Qdrant + (옵션) Reranker 결과만 반환 */
+    /** "templated" → inquiry_templated 컬렉션, 그 외 → default 컬렉션 */
+    private String resolveCollection(String mode) {
+        if ("templated".equalsIgnoreCase(mode)) {
+            return qdrantService.getTemplatedCollection();
+        }
+        return qdrantService.getDefaultCollection();
+    }
+
     public Map<String, Object> searchOnly(String question, String propCd) throws Exception {
+        return searchOnly(question, propCd, null);
+    }
+
+    /** 디버그·튜닝용: LLM 거치지 않고 Qdrant + (옵션) Reranker 결과만 반환 */
+    public Map<String, Object> searchOnly(String question, String propCd, String mode) throws Exception {
+        String collectionName = resolveCollection(mode);
         String searchQuery = queryRewriteEnabled ? queryRewriteService.rewrite(question) : question;
         List<Double> queryVector = ollamaService.embed(searchQuery);
         int fetchK = rerankerEnabled ? searchTopK : finalTopK;
-        List<Map<String, Object>> similarCases = qdrantService.search(queryVector, fetchK, propCd);
+        List<Map<String, Object>> similarCases = qdrantService.searchIn(collectionName, queryVector, fetchK, propCd);
         List<Map<String, Object>> filteredCases = similarCases.stream()
                 .filter(c -> ((Number) c.get("score")).doubleValue() >= scoreThreshold)
                 .collect(Collectors.toList());
@@ -262,6 +484,16 @@ public class RagService {
             // title 제거 (2026-04-20) — 실데이터 미사용 확인 후 payload에서 완전히 제거
             s.put("report", payload.get("report"));
             s.put("feedback", payload.get("feedback"));
+            // 접수시스템/접수내용 — UI 카드에 태그로 표시, 추후 필터 옵션용
+            s.put("system_cd", payload.get("system_cd"));
+            s.put("system_nm", payload.get("system_nm"));
+            s.put("system_tp_dtl", payload.get("system_tp_dtl"));
+            s.put("system_tp_dtl_nm", payload.get("system_tp_dtl_nm"));
+            // HyDE 템플릿 필드 (templated 컬렉션의 경우에만 존재. default 컬렉션엔 null)
+            if (payload.containsKey("core_question")) s.put("core_question", payload.get("core_question"));
+            if (payload.containsKey("situation")) s.put("situation", payload.get("situation"));
+            if (payload.containsKey("cause")) s.put("cause", payload.get("cause"));
+            if (payload.containsKey("solution")) s.put("solution", payload.get("solution"));
             s.put("score", c.get("score"));
             if (c.containsKey("rerank_score")) {
                 s.put("rerank_score", c.get("rerank_score"));

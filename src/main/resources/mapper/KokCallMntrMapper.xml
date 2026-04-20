@@ -4,40 +4,83 @@
 
 <mapper namespace="com.ragtest.repository.KokCallMntrMapper">
 
+    <!--
+      공통 JOIN 블록: 접수시스템(CC00010) + 접수내용(CC00015) 코드명 매핑.
+      단순화를 위해 공통코드(PROP_CD='0000000000', CMPX_CD='00000')만 참조.
+      지점 override 코드는 운영상 드물어 미반영 — 필요 시 확장.
+    -->
+    <sql id="joinCodes">
+        LEFT JOIN PMS_CODE_DTL SYS
+            ON SYS.MTR_CD = 'CC00010'
+           AND SYS.DTL_CD = A.SYSTEM_CD
+           AND SYS.PROP_CD = '0000000000'
+           AND SYS.CMPX_CD = '00000'
+           AND SYS.USE_YN = 'Y'
+        LEFT JOIN PMS_CODE_DTL CNT
+            ON CNT.MTR_CD = 'CC00015'
+           AND CNT.DTL_CD = A.SYSTEM_TP_DTL
+           AND CNT.PROP_CD = '0000000000'
+           AND CNT.CMPX_CD = '00000'
+           AND CNT.USE_YN = 'Y'
+    </sql>
+
+    <sql id="baseColumns">
+        A.SEQ_NO           as seqNo,
+        A.PROP_CD          as propCd,
+        A.TITLE            as title,
+        A.REPORT           as report,
+        A.RACTION          as raction,
+        A.FEEDBACK         as feedback,
+        A.FEEDBACK_YN      as feedbackYn,
+        DATE_FORMAT(A.R_DT, '%Y-%m-%d') as rDt,
+        A.SYSTEM_CD        as systemCd,
+        SYS.DTL_CD_FULL_NM as systemNm,
+        A.SYSTEM_TP_DTL    as systemTpDtl,
+        CNT.DTL_CD_FULL_NM as systemTpDtlNm
+    </sql>
+
     <select id="selectAll" resultType="com.ragtest.dto.KokCallMntrDto">
         SELECT
-            SEQ_NO      as seqNo,
-            PROP_CD     as propCd,
-            TITLE       as title,
-            REPORT      as report,
-            RACTION     as raction,
-            FEEDBACK    as feedback,
-            FEEDBACK_YN as feedbackYn,
-            DATE_FORMAT(R_DT, '%Y-%m-%d') as rDt
-        FROM KOK_CALL_MNTR
-        WHERE REPORT IS NOT NULL
-        AND TRIM(REPORT) != ''
-        AND FEEDBACK IS NOT NULL
-        AND TRIM(FEEDBACK) != ''
-        AND FEEDBACK_YN = 'Y'
-        AND '2025-01-01' > R_DT
-        ORDER BY R_DT DESC
---         LIMIT 5000
---         LIMIT 100
+            <include refid="baseColumns"/>
+        FROM KOK_CALL_MNTR A
+        <include refid="joinCodes"/>
+        WHERE A.REPORT IS NOT NULL
+          AND TRIM(A.REPORT) != ''
+          AND A.FEEDBACK IS NOT NULL
+          AND TRIM(A.FEEDBACK) != ''
+          AND A.FEEDBACK_YN = 'Y'
+          AND '2025-01-01' > A.R_DT
+        ORDER BY A.R_DT DESC
     </select>
 
     <select id="selectAfter" resultType="com.ragtest.dto.KokCallMntrDto">
         SELECT
-            SEQ_NO as seqNo, PROP_CD as propCd, TITLE as title,
-            REPORT as report, RACTION as raction, FEEDBACK as feedback,
-            FEEDBACK_YN as feedbackYn, DATE_FORMAT(R_DT, '%Y-%m-%d') as rDt
-        FROM KOK_CALL_MNTR
-        WHERE REPORT IS NOT NULL
-          AND TRIM(REPORT) != ''
-      AND FEEDBACK IS NOT NULL
-      AND TRIM(FEEDBACK) != ''
-      AND FEEDBACK_YN = 'Y'
-      AND R_DT > #{lastSyncDt}
-        ORDER BY R_DT ASC
+            <include refid="baseColumns"/>
+        FROM KOK_CALL_MNTR A
+        <include refid="joinCodes"/>
+        WHERE A.REPORT IS NOT NULL
+          AND TRIM(A.REPORT) != ''
+          AND A.FEEDBACK IS NOT NULL
+          AND TRIM(A.FEEDBACK) != ''
+          AND A.FEEDBACK_YN = 'Y'
+          AND A.R_DT > #{lastSyncDt}
+        ORDER BY A.R_DT ASC
+    </select>
+
+    <!-- 실패 재시도용: 동일 필터 유지. 데이터가 바뀌어 더 이상 대상이 아니면 0건 반환 -->
+    <select id="selectBySeqNos" resultType="com.ragtest.dto.KokCallMntrDto">
+        SELECT
+            <include refid="baseColumns"/>
+        FROM KOK_CALL_MNTR A
+        <include refid="joinCodes"/>
+        WHERE A.SEQ_NO IN
+        <foreach collection="seqNos" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        AND A.REPORT IS NOT NULL
+        AND TRIM(A.REPORT) != ''
+        AND A.FEEDBACK IS NOT NULL
+        AND TRIM(A.FEEDBACK) != ''
+        AND A.FEEDBACK_YN = 'Y'
     </select>
 </mapper>

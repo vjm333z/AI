@@ -9,6 +9,12 @@ public class KokCallMntrDto {
     private String feedback;
     private String feedbackYn;
     private String rDt;
+    // 접수시스템(SYSTEM_CD = CC00010) + 접수내용(SYSTEM_TP_DTL = CC00015)
+    // Mapper JOIN으로 코드·한글명 함께 채움 (payload 저장용)
+    private String systemCd;
+    private String systemNm;
+    private String systemTpDtl;
+    private String systemTpDtlNm;
 
     public Integer getSeqNo() { return seqNo; }
     public void setSeqNo(Integer seqNo) { this.seqNo = seqNo; }
@@ -33,6 +39,18 @@ public class KokCallMntrDto {
 
     public String getRDt() { return rDt; }
     public void setRDt(String rDt) { this.rDt = rDt; }
+
+    public String getSystemCd() { return systemCd; }
+    public void setSystemCd(String systemCd) { this.systemCd = systemCd; }
+
+    public String getSystemNm() { return systemNm; }
+    public void setSystemNm(String systemNm) { this.systemNm = systemNm; }
+
+    public String getSystemTpDtl() { return systemTpDtl; }
+    public void setSystemTpDtl(String systemTpDtl) { this.systemTpDtl = systemTpDtl; }
+
+    public String getSystemTpDtlNm() { return systemTpDtlNm; }
+    public void setSystemTpDtlNm(String systemTpDtlNm) { this.systemTpDtlNm = systemTpDtlNm; }
 
     /**
      * 임베딩용 텍스트 (Q-Q 매칭).

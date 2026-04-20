@@ -57,6 +57,7 @@ public class RagController {
     }
 
     // 질문 → RAG 답변 (+ 유사 사례 원문)
+    // mode: "default" | "templated" — A/B 비교용 컬렉션 선택
     @PostMapping("/ask")
     public Map<String, Object> ask(@RequestBody(required = false) Map<String, Object> body) {
         Map<String, Object> result = new HashMap<>();
@@ -70,6 +71,7 @@ public class RagController {
 
             String question = body.get("question") != null ? body.get("question").toString().trim() : "";
             String propCd = body.get("propCd") != null ? body.get("propCd").toString().trim() : null;
+            String mode = body.get("mode") != null ? body.get("mode").toString().trim() : null;
 
             if (question.isEmpty()) {
                 result.put("success", false);
@@ -82,15 +84,32 @@ public class RagController {
                 return result;
             }
 
-            log.info("Received question: {} (propCd={})", question, propCd);
+            log.info("Received question: {} (propCd={}, mode={})", question, propCd, mode);
 
-            Map<String, Object> ragResult = ragService.ask(question, propCd);
+            Map<String, Object> ragResult = ragService.ask(question, propCd, mode);
             result.put("success", true);
+            result.put("mode", mode != null ? mode : "default");
             result.put("answer", ragResult.get("answer"));
             result.put("sources", ragResult.get("sources"));
             result.put("elapsed_ms", System.currentTimeMillis() - started);
         } catch (Exception e) {
             log.error("ask 처리 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /** HyDE 하이브리드 템플릿 적재 (inquiry_templated 컬렉션). */
+    @PostMapping("/index/templated")
+    public Map<String, Object> indexTemplated() {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String msg = ragService.indexAllTemplated();
+            result.put("success", true);
+            result.put("message", msg);
+        } catch (Exception e) {
+            log.error("템플릿 적재 실패", e);
             result.put("success", false);
             result.put("message", e.getMessage());
         }
@@ -104,12 +123,13 @@ public class RagController {
         try {
             String question = body.get("question") != null ? body.get("question").toString().trim() : "";
             String propCd = body.get("propCd") != null ? body.get("propCd").toString().trim() : null;
+            String mode = body.get("mode") != null ? body.get("mode").toString().trim() : null;
             if (question.isEmpty()) {
                 result.put("success", false);
                 result.put("message", "question은 필수입니다.");
                 return result;
             }
-            Map<String, Object> searchResult = ragService.searchOnly(question, propCd);
+            Map<String, Object> searchResult = ragService.searchOnly(question, propCd, mode);
             result.put("success", true);
             result.putAll(searchResult);
         } catch (Exception e) {
@@ -160,6 +180,35 @@ public class RagController {
             result.put("message", msg);
         } catch (Exception e) {
             log.error("증분 적재 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /** 실패 장부 조회 (failed_index.txt). 개수·사유별 집계·샘플 10건. */
+    @GetMapping("/index/failed")
+    public Map<String, Object> failedList() {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            result.put("success", true);
+            result.putAll(ragService.failedSummary());
+        } catch (Exception e) {
+            log.error("실패 조회 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /** 실패 장부에 있는 seq_no들을 DB에서 재조회해 다시 적재. 성공 건은 장부에서 제거. */
+    @PostMapping("/index/retry-failed")
+    public Map<String, Object> retryFailed() {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            result.putAll(ragService.retryFailed());
+        } catch (Exception e) {
+            log.error("재시도 실패", e);
             result.put("success", false);
             result.put("message", e.getMessage());
         }

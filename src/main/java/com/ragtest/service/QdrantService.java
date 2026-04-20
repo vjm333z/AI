@@ -33,37 +33,45 @@ public class QdrantService {
     @Value("${qdrant.collection}")
     private String collection;
 
+    @Value("${qdrant.collection-templated:inquiry_templated}")
+    private String collectionTemplated;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    public String getDefaultCollection() { return collection; }
+    public String getTemplatedCollection() { return collectionTemplated; }
+
     /**
-     * 앱 시동 시 컬렉션이 없으면 자동 생성 + prop_cd 필드 인덱스 보장.
+     * 앱 시동 시 두 컬렉션(default + templated)이 없으면 자동 생성 + prop_cd 인덱스 보장.
      * Qdrant 미기동 상태에서 앱만 올라가는 경우를 위해 실패해도 앱은 죽지 않음.
      */
     @PostConstruct
     public void init() {
         try {
-            if (!collectionExists()) {
-                log.info("Qdrant 컬렉션 '{}' 미존재 → 자동 생성 (dim={}, Cosine)", collection, VECTOR_DIM);
-                createCollection();
+            for (String name : new String[]{collection, collectionTemplated}) {
+                if (!collectionExists(name)) {
+                    log.info("Qdrant 컬렉션 '{}' 미존재 → 자동 생성 (dim={}, Cosine)", name, VECTOR_DIM);
+                    createCollection(name);
+                }
+                ensurePropCdIndex(name);
             }
-            ensurePropCdIndex();
         } catch (Exception e) {
             log.warn("Qdrant 초기화 스킵 (Qdrant 미기동 가능성): {}", e.getMessage());
         }
     }
 
-    private boolean collectionExists() throws Exception {
+    private boolean collectionExists(String name) throws Exception {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet get = new HttpGet(qdrantUrl + "/collections/" + collection);
+            HttpGet get = new HttpGet(qdrantUrl + "/collections/" + name);
             try (CloseableHttpResponse res = client.execute(get)) {
                 return res.getStatusLine().getStatusCode() == 200;
             }
         }
     }
 
-    private void createCollection() throws Exception {
+    private void createCollection(String name) throws Exception {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPut put = new HttpPut(qdrantUrl + "/collections/" + collection);
+            HttpPut put = new HttpPut(qdrantUrl + "/collections/" + name);
             put.setHeader("Content-Type", "application/json");
             Map<String, Object> vectors = new HashMap<>();
             vectors.put("size", VECTOR_DIM);
@@ -77,10 +85,9 @@ public class QdrantService {
         }
     }
 
-    /** prop_cd 필드에 keyword 인덱스 생성 (필터 성능 향상, 중복 호출 안전) */
-    private void ensurePropCdIndex() throws Exception {
+    private void ensurePropCdIndex(String name) throws Exception {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPut put = new HttpPut(qdrantUrl + "/collections/" + collection + "/index");
+            HttpPut put = new HttpPut(qdrantUrl + "/collections/" + name + "/index");
             put.setHeader("Content-Type", "application/json");
             Map<String, Object> body = new HashMap<>();
             body.put("field_name", "prop_cd");
@@ -92,19 +99,34 @@ public class QdrantService {
         }
     }
 
-    // 벡터 저장
+    /** default 컬렉션(inquiry)에 기본 payload로 저장 — 기존 호출부 호환 */
     public void upsert(Integer id, List<Double> vector, KokCallMntrDto dto) throws Exception {
-        HttpPut put = new HttpPut(qdrantUrl + "/collections/" + collection + "/points?wait=true");
+        upsertTo(collection, id, vector, dto, null);
+    }
+
+    /**
+     * 컬렉션 지정 + extra payload(HyDE 필드 등) 추가 저장.
+     * @param collectionName 대상 컬렉션 이름
+     * @param extraPayload   추가 key/value (core_question, situation, cause, solution 등). null 허용.
+     */
+    public void upsertTo(String collectionName, Integer id, List<Double> vector,
+                         KokCallMntrDto dto, Map<String, Object> extraPayload) throws Exception {
+        HttpPut put = new HttpPut(qdrantUrl + "/collections/" + collectionName + "/points?wait=true");
         put.setHeader("Content-Type", "application/json; charset=utf-8");
         put.setHeader("Accept", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("seq_no", dto.getSeqNo());
         payload.put("prop_cd", dto.getPropCd());
-        // TITLE은 최근 운영 데이터에서 실제로 거의 안 쓰이고 "(제목 없음)" 케이스가 많아
-        // 임베딩·payload 양쪽에서 완전히 제거 (2026-04-20 결정)
+        // TITLE 제거 (2026-04-20) · Q-Q 매칭 전략상 임베딩·payload 모두 배제
         payload.put("report", KokCallMntrDto.cleanDisplay(dto.getReport()));
         payload.put("feedback", KokCallMntrDto.cleanDisplay(dto.getFeedback()));
+        // 접수시스템/접수내용 (CC00010/CC00015) — 필터·통계·UI 표시용
+        payload.put("system_cd", dto.getSystemCd());
+        payload.put("system_nm", dto.getSystemNm());
+        payload.put("system_tp_dtl", dto.getSystemTpDtl());
+        payload.put("system_tp_dtl_nm", dto.getSystemTpDtlNm());
+        if (extraPayload != null) payload.putAll(extraPayload);
 
         Map<String, Object> point = new LinkedHashMap<>();
         point.put("id", id.longValue());
@@ -115,7 +137,7 @@ public class QdrantService {
         body.put("points", Collections.singletonList(point));
 
         byte[] jsonBytes = objectMapper.writeValueAsBytes(body);
-        log.debug("Qdrant upsert id={}, seq_no={}", id, dto.getSeqNo());
+        log.debug("Qdrant upsert collection={}, id={}, seq_no={}", collectionName, id, dto.getSeqNo());
 
         ByteArrayEntity entity = new ByteArrayEntity(jsonBytes);
         entity.setContentType("application/json; charset=utf-8");
@@ -126,23 +148,38 @@ public class QdrantService {
             String responseBody = EntityUtils.toString(response.getEntity(), "UTF-8");
             int status = response.getStatusLine().getStatusCode();
             if (status < 200 || status >= 300) {
-                throw new RuntimeException("Qdrant upsert 실패 status=" + status + " body=" + responseBody);
+                throw new RuntimeException("Qdrant upsert 실패 collection=" + collectionName
+                        + " status=" + status + " body=" + responseBody);
             }
-            log.debug("Qdrant upsert response: {}", responseBody);
         }
+    }
+
+    public List<Map<String, Object>> scrollAllPayloads() throws Exception {
+        return scrollAllPayloadsOf(collection);
+    }
+
+    /** 지정 컬렉션의 seq_no 집합만 빠르게 수집 (중복 적재 방지용). */
+    public Set<Integer> collectSeqNos(String collectionName) throws Exception {
+        Set<Integer> seqs = new HashSet<>();
+        for (Map<String, Object> p : scrollAllPayloadsOf(collectionName)) {
+            Map<String, Object> payload = (Map<String, Object>) p.get("payload");
+            Object v = payload != null ? payload.get("seq_no") : null;
+            if (v instanceof Number) seqs.add(((Number) v).intValue());
+        }
+        return seqs;
     }
 
     /**
      * 컬렉션 전체 payload 스크롤 (카테고리 분석·디버그용).
      * 3천 건 규모 가정. 수만 건 이상이면 페이징·샘플링 전략 재검토 필요.
      */
-    public List<Map<String, Object>> scrollAllPayloads() throws Exception {
+    public List<Map<String, Object>> scrollAllPayloadsOf(String collectionName) throws Exception {
         List<Map<String, Object>> all = new ArrayList<>();
         Object offset = null;
         int batchSize = 1000;
 
         while (true) {
-            HttpPost post = new HttpPost(qdrantUrl + "/collections/" + collection + "/points/scroll");
+            HttpPost post = new HttpPost(qdrantUrl + "/collections/" + collectionName + "/points/scroll");
             post.setHeader("Content-Type", "application/json");
             post.setHeader("Accept", "application/json");
 
@@ -186,9 +223,14 @@ public class QdrantService {
         return all;
     }
 
-    // 유사 벡터 검색 (propCd null이면 필터 없음)
+    /** default 컬렉션 검색 — 기존 호출부 호환 */
     public List<Map<String, Object>> search(List<Double> queryVector, int topK, String propCd) throws Exception {
-        HttpPost post = new HttpPost(qdrantUrl + "/collections/" + collection + "/points/search");
+        return searchIn(collection, queryVector, topK, propCd);
+    }
+
+    // 유사 벡터 검색 (propCd null이면 필터 없음) — 컬렉션 지정 가능
+    public List<Map<String, Object>> searchIn(String collectionName, List<Double> queryVector, int topK, String propCd) throws Exception {
+        HttpPost post = new HttpPost(qdrantUrl + "/collections/" + collectionName + "/points/search");
         post.setHeader("Content-Type", "application/json");
         post.setHeader("Accept", "application/json");
 
