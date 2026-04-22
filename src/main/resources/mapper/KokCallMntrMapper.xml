@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.ragtest.repository.KokCallMntrMapper">
+<mapper namespace="com.recallai.repository.KokCallMntrMapper">
 
     <!--
       공통 JOIN 블록: 접수시스템(CC00010) + 접수내용(CC00015) 코드명 매핑.
@@ -39,7 +39,7 @@
         CNT.DTL_CD_FULL_NM as systemTpDtlNm
     </sql>
 
-    <select id="selectAll" resultType="com.ragtest.dto.KokCallMntrDto">
+    <select id="selectAll" resultType="com.recallai.dto.KokCallMntrDto">
         SELECT
             <include refid="baseColumns"/>
         FROM KOK_CALL_MNTR A
@@ -53,7 +53,7 @@
         ORDER BY A.R_DT DESC
     </select>
 
-    <select id="selectAfter" resultType="com.ragtest.dto.KokCallMntrDto">
+    <select id="selectAfter" resultType="com.recallai.dto.KokCallMntrDto">
         SELECT
             <include refid="baseColumns"/>
         FROM KOK_CALL_MNTR A
@@ -68,7 +68,7 @@
     </select>
 
     <!-- 실패 재시도용: 동일 필터 유지. 데이터가 바뀌어 더 이상 대상이 아니면 0건 반환 -->
-    <select id="selectBySeqNos" resultType="com.ragtest.dto.KokCallMntrDto">
+    <select id="selectBySeqNos" resultType="com.recallai.dto.KokCallMntrDto">
         SELECT
             <include refid="baseColumns"/>
         FROM KOK_CALL_MNTR A

@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.ragtest</groupId>
-    <artifactId>rag-test</artifactId>
+    <groupId>com.recallai</groupId>
+    <artifactId>recall-ai</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>rag-test</name>
-    <description>RAG 테스트 프로젝트 - 기억사무소</description>
+    <name>RecallAI</name>
+    <description>RecallAI - 호텔 문의 RAG 답변 시스템</description>
 
     <properties>
         <java.version>1.8</java.version>

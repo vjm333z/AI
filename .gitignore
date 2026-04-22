@@ -8,10 +8,9 @@ target/
 *.iws
 *.ipr
 
-# 민감정보
-application.yml
-application-*.yml
-application.properties
+# 민감정보 (application.yml은 이제 env var 플레이스홀더만 있어서 추적 가능)
+application-local.yml
+application-local.properties
 *.env
 
 # Logs
