@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>기억사무소 RAG - A/B 테스트</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Malgun Gothic", sans-serif;
+      max-width: 1400px;
+      margin: 24px auto;
+      padding: 0 20px;
+      background: #fafafa;
+      color: #222;
+    }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .sub { color: #888; font-size: 13px; margin-bottom: 20px; }
+    .card { background: #fff; border: 1px solid #e3e3e3; border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+    label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; color: #555; }
+    input, textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px;
+      font-family: inherit; font-size: 14px; margin-bottom: 10px;
+    }
+    textarea { resize: vertical; min-height: 70px; }
+    button {
+      padding: 10px 20px; background: #2a66ff; color: #fff; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    button:hover { background: #1d52d9; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    .sample { font-size:12px; padding:3px 10px; border:1px solid #ccd; border-radius:12px; cursor:pointer; color:#555; background:#f9f9ff; }
+    .sample:hover { background:#e8f0ff; border-color:#2a66ff; color:#2a66ff; }
+    .pill { padding:2px 8px; border-radius:10px; font-weight:600; }
+    .pill.ok { background:#e0f6e4; color:#1a7f37; }
+    .pill.off { background:#ffe8e0; color:#b1400e; }
+
+    .ab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 1000px) { .ab-grid { grid-template-columns: 1fr; } }
+
+    .col { display: flex; flex-direction: column; min-width: 0; }
+    .col-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: 8px 8px 0 0;
+      color: #fff; font-weight: 700; font-size: 14px;
+    }
+    .col-head.default { background: #4d78d8; }
+    .col-head.templated { background: #7a4dd8; }
+    .col-body { background: #fff; border: 1px solid #e3e3e3; border-top: none; border-radius: 0 0 8px 8px; padding: 14px; flex: 1; }
+
+    .answer { background: #f3f8ff; border-left: 4px solid #2a66ff; padding: 12px; border-radius: 4px; white-space: pre-wrap; font-size: 14px; margin-bottom: 10px; }
+    .elapsed { font-size: 11px; color: #888; margin-bottom: 8px; }
+    .source {
+      padding: 10px 12px; border: 1px solid #e3e3e3; border-radius: 6px; margin-bottom: 6px;
+      cursor: pointer; background: #fff;
+    }
+    .source:hover { background: #f5f5f5; border-color: #2a66ff; }
+    .src-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px; }
+    .src-score { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #eef4ff; color: #2a66ff; font-weight: 600; }
+    .src-rerank { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #fff4e5; color: #c57400; font-weight: 600; }
+    .src-cat { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #eef; color: #447; font-weight: 600; }
+    .src-sim { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #ffe8f0; color: #b1407a; font-weight: 600; }
+    .src-preview { font-size: 12px; color: #666; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+    .src-hyde { font-size: 12px; color: #334; margin-bottom: 4px; }
+    .src-hyde b { color: #7a4dd8; }
+
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+    .modal.show { display: flex; align-items: center; justify-content: center; }
+    .modal-content { background: #fff; max-width: 720px; width: 92%; max-height: 82vh; overflow-y: auto; border-radius: 10px; padding: 24px; }
+    .modal-close { float: right; cursor: pointer; font-size: 20px; color: #888; }
+    .modal-sec { margin-top: 14px; }
+    .modal-sec h4 { font-size: 13px; color: #555; margin-bottom: 6px; }
+    .modal-sec .body { background: #f7f7f7; padding: 12px; border-radius: 6px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
+    .meta { font-size: 12px; color: #999; margin-top: 4px; }
+    .loading { color: #888; font-style: italic; }
+    .error { color: #c00; padding: 12px; background: #fee; border-radius: 6px; }
+    .section-title { font-size: 12px; font-weight: 700; color: #555; margin: 10px 0 6px; letter-spacing: 0.3px; }
+    .faq-card {
+      padding: 10px 12px; border: 1px solid #d0ecd8; border-radius: 6px; margin-bottom: 6px;
+      background: #f4fbf6; cursor: pointer;
+    }
+    .faq-card:hover { background: #e8f7ed; border-color: #2e9e56; }
+    .faq-score { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #d6f0de; color: #1a7f37; font-weight: 600; }
+    .faq-cat  { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #eef; color: #447; font-weight: 600; }
+    .faq-q    { font-size: 13px; font-weight: 600; color: #1a3a1a; margin: 5px 0 3px; }
+    .faq-a    { font-size: 12px; color: #555; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  </style>
+</head>
+<body>
+  <h1>기억사무소 RAG - A/B 비교 테스트</h1>
+  <div class="sub">같은 질문을 두 컬렉션(원본 vs HyDE 템플릿)에 동시 질의해 품질 비교.</div>
+
+  <div class="card">
+    <label for="q">질문</label>
+    <textarea id="q" placeholder="예) 카드 승인 실패 후 바탕화면으로 튕김"></textarea>
+    <label for="prop">propCd (선택)</label>
+    <input id="prop" placeholder="비워두면 전체 검색" />
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <button id="askBtn" onclick="ask()">A/B 질문하기 (Ctrl+Enter)</button>
+      <span style="font-size:12px; color:#888;">샘플:</span>
+      <span class="sample" onclick="setQ('Seetrol 접속이 해제되었어요')">Seetrol 해제</span>
+      <span class="sample" onclick="setQ('카드 결제가 승인되지 않고 바탕화면으로 튕겨요')">카드 승인 실패</span>
+      <span class="sample" onclick="setQ('객실키 발급이 안됩니다')">객실키 발급</span>
+      <span class="sample" onclick="setQ('예약자 이름 띄어쓰기로 조회가 안돼요')">조회 문제</span>
+      <span class="sample" onclick="setQ('영수증 용지가 없습니다')">영수증 용지</span>
+    </div>
+    <div id="statusBar" style="margin-top:10px; font-size:12px; color:#888; display:flex; gap:14px; align-items:center;"></div>
+  </div>
+
+  <div id="result"></div>
+
+  <div id="modal" class="modal" onclick="if(event.target.id==='modal') closeModal()">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeModal()">×</span>
+      <h3 id="mTitle"></h3>
+      <div id="mMeta" class="meta"></div>
+      <div id="mHyde" class="modal-sec" style="display:none"><h4>HyDE 추출</h4><div class="body" id="mHydeBody"></div></div>
+      <div class="modal-sec"><h4 id="mReportLabel">문의 내용 (원문)</h4><div id="mReport" class="body"></div></div>
+      <div class="modal-sec"><h4 id="mFeedbackLabel">답변 (원문)</h4><div id="mFeedback" class="body"></div></div>
+    </div>
+  </div>
+
+  <script>
+    let sourcesByMode = { default: [], templated: [] };
+    let faqByMode = { default: [], templated: [] };
+
+    async function ask() {
+      const question = document.getElementById('q').value.trim();
+      const propCd = document.getElementById('prop').value.trim();
+      if (!question) return;
+      const result = document.getElementById('result');
+      const btn = document.getElementById('askBtn');
+      btn.disabled = true;
+      result.innerHTML = '<div class="card loading">두 컬렉션에 병렬 질의 중...</div>';
+
+      const base = { question };
+      if (propCd) base.propCd = propCd;
+
+      try {
+        const [defaultRes, templatedRes] = await Promise.allSettled([
+          fetchAsk({ ...base, mode: 'default' }),
+          fetchAsk({ ...base, mode: 'templated' })
+        ]);
+        render(defaultRes, templatedRes);
+      } catch (e) {
+        result.innerHTML = '<div class="card error">' + e.message + '</div>';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function fetchAsk(body) {
+      const res = await fetch('/api/rag/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      return res.json();
+    }
+
+    function render(defRes, tplRes) {
+      const result = document.getElementById('result');
+      result.innerHTML =
+        '<div class="ab-grid">'
+          + renderColumn('default', 'A · 원본 (inquiry)', defRes)
+          + renderColumn('templated', 'B · HyDE 템플릿 (inquiry_templated)', tplRes)
+        + '</div>';
+    }
+
+    function renderColumn(mode, label, res) {
+      let body = '';
+      if (res.status === 'rejected') {
+        body = '<div class="error">' + escapeHtml(res.reason?.message || '요청 실패') + '</div>';
+      } else if (!res.value.success) {
+        body = '<div class="error">' + escapeHtml(res.value.message || '요청 실패') + '</div>';
+      } else {
+        const d = res.value;
+        sourcesByMode[mode] = d.sources || [];
+        faqByMode[mode] = d.faq || [];
+        const faqHtml = (d.faq || []).length
+          ? '<div class="section-title">📚 FAQ</div>' + (d.faq || []).map((f, i) => renderFaqCard(mode, f, i)).join('')
+          : '';
+        const srcHtml = (d.sources || []).length
+          ? '<div class="section-title">🔍 유사사례</div>' + (d.sources || []).map((s, i) => renderSource(mode, s, i)).join('')
+          : '<div style="color:#888;font-size:13px">유사 사례 없음</div>';
+        body = '<div class="elapsed">⏱ ' + (d.elapsed_ms || 0) + 'ms · FAQ ' + (d.faq||[]).length + '건 · 유사사례 ' + (d.sources||[]).length + '건</div>'
+             + '<div class="answer">' + escapeHtml(d.answer || '(응답 없음)') + '</div>'
+             + faqHtml + srcHtml;
+      }
+      return '<div class="col">'
+        + '<div class="col-head ' + mode + '">' + label + '</div>'
+        + '<div class="col-body">' + body + '</div>'
+        + '</div>';
+    }
+
+    function renderSource(mode, s, i) {
+      const score = s.score != null ? (s.score * 100).toFixed(1) + '%' : '-';
+      const rerank = s.rerank_score != null ? (s.rerank_score * 100).toFixed(1) + '%' : null;
+      const cat = s.system_nm || s.system_cd;
+      const cat2 = s.system_tp_dtl_nm || s.system_tp_dtl;
+      let hydeBlock = '';
+      if (s.core_question) {
+        hydeBlock = '<div class="src-hyde"><b>Q:</b> ' + escapeHtml(s.core_question) + '</div>';
+      }
+      const simCount = s.similar_count;
+      return '<div class="source" onclick="openModal(\'' + mode + '\',' + i + ')">'
+        + '<div class="src-head">'
+          + '<span class="src-score">' + score + '</span>'
+          + (rerank ? '<span class="src-rerank">rerank ' + rerank + '</span>' : '')
+          + (cat ? '<span class="src-cat">' + escapeHtml(cat) + (cat2 ? ' / ' + escapeHtml(cat2) : '') + '</span>' : '')
+          + (simCount > 0 ? '<span class="src-sim" title="MMR로 접힌 유사 사례 수">유사 +' + simCount + '건</span>' : '')
+          + '<span style="font-size:11px;color:#999">#' + (s.seq_no || '-') + '</span>'
+        + '</div>'
+        + hydeBlock
+        + '<div class="src-preview">' + escapeHtml(stripHtml(s.report || '')) + '</div>'
+        + '</div>';
+    }
+
+    function renderFaqCard(mode, f, i) {
+      const score = f.score != null ? (f.score * 100).toFixed(1) + '%' : '-';
+      return '<div class="faq-card" onclick="openFaqModal(\'' + mode + '\',' + i + ')">'
+        + '<div class="src-head">'
+          + '<span class="faq-score">' + score + '</span>'
+          + (f.category ? '<span class="faq-cat">' + escapeHtml(f.category) + '</span>' : '')
+        + '</div>'
+        + '<div class="faq-q">' + escapeHtml(f.question || '') + '</div>'
+        + '<div class="faq-a">' + escapeHtml(f.answer || '') + '</div>'
+        + '</div>';
+    }
+
+    function openFaqModal(mode, i) {
+      const f = (faqByMode[mode] || [])[i];
+      if (!f) return;
+      document.getElementById('mTitle').textContent = '📚 FAQ · ' + (f.category || '');
+      document.getElementById('mMeta').textContent = (f.faq_id || '') + ' · 유사도 ' + (f.score * 100).toFixed(1) + '%';
+      document.getElementById('mHyde').style.display = 'none';
+      document.getElementById('mReportLabel').textContent = '질문';
+      document.getElementById('mFeedbackLabel').textContent = '답변';
+      document.getElementById('mReport').textContent = f.question || '';
+      document.getElementById('mFeedback').textContent = f.answer || '';
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function openModal(mode, i) {
+      const s = (sourcesByMode[mode] || [])[i];
+      if (!s) return;
+      document.getElementById('mReportLabel').textContent = '문의 내용 (원문)';
+      document.getElementById('mFeedbackLabel').textContent = '답변 (원문)';
+      document.getElementById('mTitle').textContent = (mode === 'templated' ? '[B] ' : '[A] ') + (s.core_question || '#' + s.seq_no);
+      const cat = [s.system_nm, s.system_tp_dtl_nm].filter(Boolean).join(' / ');
+      document.getElementById('mMeta').textContent =
+        'seq_no=' + s.seq_no + (s.prop_cd ? ' · propCd=' + s.prop_cd : '')
+        + (cat ? ' · ' + cat : '')
+        + ' · 유사도 ' + (s.score * 100).toFixed(1) + '%'
+        + (s.rerank_score != null ? ' · rerank ' + (s.rerank_score * 100).toFixed(1) + '%' : '');
+
+      const hydeSec = document.getElementById('mHyde');
+      const hydeBody = document.getElementById('mHydeBody');
+      if (s.core_question || s.situation || s.cause || s.solution) {
+        hydeBody.textContent =
+          'Q: ' + (s.core_question || '') + '\n'
+          + '상황: ' + (s.situation || '') + '\n'
+          + '원인: ' + (s.cause || '') + '\n'
+          + '조치: ' + (s.solution || '');
+        hydeSec.style.display = '';
+      } else {
+        hydeSec.style.display = 'none';
+      }
+      document.getElementById('mReport').textContent = stripHtml(s.report || '');
+      document.getElementById('mFeedback').textContent = stripHtml(s.feedback || '');
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+    function stripHtml(s) { return String(s || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); }
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    document.getElementById('q').addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') ask();
+    });
+
+    function setQ(text) {
+      document.getElementById('q').value = text;
+      document.getElementById('q').focus();
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/rag/status');
+        const data = await res.json();
+        const bar = document.getElementById('statusBar');
+        const q = data.qdrant || {};
+        const r = data.reranker || {};
+        bar.innerHTML =
+          '<span>Qdrant(default): <span class="pill ' + (q.available ? 'ok' : 'off') + '">' + (q.available ? (q.points_count + '건') : 'OFF') + '</span></span>'
+          + '<span>Reranker: <span class="pill ' + (r.available && data.reranker_enabled ? 'ok' : 'off') + '">' + (r.available && data.reranker_enabled ? 'ON' : 'OFF') + '</span></span>'
+          + '<span>Query Rewrite: <span class="pill ' + (data.query_rewrite_enabled ? 'ok' : 'off') + '">' + (data.query_rewrite_enabled ? 'ON' : 'OFF') + '</span></span>';
+      } catch (e) {}
+    }
+    loadStatus();
+    setInterval(loadStatus, 5000);
+  </script>
+</body>
+</html>

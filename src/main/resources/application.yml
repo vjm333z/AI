@@ -29,8 +29,7 @@ management:
 ollama:
   url: ${OLLAMA_URL:http://localhost:11434}
   model: bge-m3
-  llm-model: gemma3:4b
-  timeout-ms: 30000          # 긴 텍스트 임베딩 여유
+timeout-ms: 30000          # 긴 텍스트 임베딩 여유
 
 # Qdrant 설정
 qdrant:
@@ -41,7 +40,7 @@ qdrant:
 
 # RAG 검색 파이프라인 설정
 rag:
-  data-dir: ${RAG_DATA_DIR:.}        # last_sync.txt / failed_index.txt 저장 경로
+  data-dir: ${RAG_DATA_DIR:data}      # hotels.json / phone_lookup.json / last_sync.txt / failed_index.txt 저장 경로
   templatize:
     provider: groq         # HyDE 적재에 사용할 LLM provider. 옵션: groq (구현됨) / claude / gemini / openai (확장 가능)
   search:

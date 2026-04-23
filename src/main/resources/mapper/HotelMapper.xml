@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.recallai.repository.HotelMapper">
+
+    <select id="selectAllProperties" resultType="com.recallai.dto.HotelDto">
+        SELECT
+            PROP_CD      as propCd,
+            PROP_SHRT_NM as propShrtNm,
+            PROP_FULL_NM as propFullNm
+        FROM PMS_PROPERTY
+        ORDER BY PROP_CD
+    </select>
+
+    <select id="selectAllComplexes" resultType="com.recallai.dto.ComplexDto">
+        SELECT
+            PROP_CD                          as propCd,
+            CMPX_CD                          as cmpxCd,
+            CMPX_NM                          as cmpxNm,
+            CMPX_TP                          as cmpxTp,
+            DECRYPT_AES256(CMPX_REPR_TEL)    as cmpxReprTel
+        FROM PMS_COMPLEX
+        ORDER BY PROP_CD, CMPX_CD
+    </select>
+
+</mapper>

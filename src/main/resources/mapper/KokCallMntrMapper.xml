@@ -27,6 +27,7 @@
     <sql id="baseColumns">
         A.SEQ_NO           as seqNo,
         A.PROP_CD          as propCd,
+        A.CMPX_CD          as cmpxCd,
         A.TITLE            as title,
         A.REPORT           as report,
         A.RACTION          as raction,
@@ -65,6 +66,15 @@
           AND A.FEEDBACK_YN = 'Y'
           AND A.R_DT > #{lastSyncDt}
         ORDER BY A.R_DT ASC
+    </select>
+
+    <!-- phone_lookup용: PROP_CD + REPORT만, 연락처 있는 건만 -->
+    <select id="selectForPhoneLookup" resultType="com.recallai.dto.KokCallMntrDto">
+        SELECT A.PROP_CD as propCd, A.REPORT as report
+        FROM KOK_CALL_MNTR A
+        WHERE A.REPORT IS NOT NULL
+          AND A.REPORT LIKE '%연락처%'
+        ORDER BY A.R_DT DESC
     </select>
 
     <!-- 실패 재시도용: 동일 필터 유지. 데이터가 바뀌어 더 이상 대상이 아니면 0건 반환 -->

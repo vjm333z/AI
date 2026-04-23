@@ -19,15 +19,16 @@ application-local.properties
 # Claude Code
 .claude/
 
-# 런타임 상태
-last_sync.txt
-failed_index.txt
+# 런타임 상태 (data/ 로 이동됨)
+data/last_sync.txt
+data/failed_index.txt
 logs/
 
 # 실험/임시 파일
 scratch/
 
-# STT 녹음 (민감 데이터)
-stt/*.mp3
-stt/__pycache__/
+# STT 녹음·결과 (민감 데이터)
+stt/recordings/
 stt/results/
+stt/__pycache__/
+stt/inbox/

@@ -1,0 +1,1041 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+호텔 PMS 상담 통화 녹취 (mp3) → STT → 요약 JSON
+
+사용법:
+    python transcribe_summarize.py recording.mp3
+    python transcribe_summarize.py recording.mp3 --model small
+    python transcribe_summarize.py recording.mp3 --output result.json --no-summary
+
+의존성:
+    pip install -r requirements.txt
+    (별도로 ffmpeg 설치 필요 — mp3 디코딩용)
+
+처음 실행 시 Whisper 모델(medium = 1.5GB) 자동 다운로드됩니다.
+"""
+
+import argparse
+import io
+import json
+import os
+import re
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+# DB 설정 기본값 (--db-host 등으로 오버라이드)
+DB_DEFAULT = {
+    "host": "127.0.0.1",
+    "port": 3307,
+    "user": "recallai",
+    "password": "recallai",
+    "database": "recallai",
+}
+
+# Windows 한글 콘솔(cp949)에서 em-dash 등 유니코드 출력 깨짐 방지
+if sys.platform == "win32":
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
+# ────────────────────────────────────────────────────────────────
+# 설정
+# ────────────────────────────────────────────────────────────────
+
+# Groq API 키 (application.yml에서 가져오거나 환경변수로 대체 권장)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    sys.exit("❌ GROQ_API_KEY 환경변수가 필요합니다. export GROQ_API_KEY=gsk_...")
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_STT_MODEL = "whisper-large-v3"
+
+# ─── 회사명 교정 (Whisper 오인식 보정) ───────────────────────
+# 자사(상담 받는 쪽)
+COMPANY_NAME = "다올 비전"
+# Whisper가 "다올 비전"을 이렇게 잘못 인식하는 패턴 모음 — 필요 시 추가
+COMPANY_VARIANTS = [
+    "다월 기자", "다올 기자", "다홀 기자", "다홀 기장", "다올 기장", "자월 비잔",
+    "다월 비전", "다홀 비전", "더울 비전",
+    "다올 비젼", "다월 비젼", "다홀 비젼",
+    "다올 기잠", "다월 기잠",
+]
+
+# Whisper에게 미리 주는 힌트 — 통화 도메인·고유명사 인식 정확도 ↑
+WHISPER_INITIAL_PROMPT = (
+    f"{COMPANY_NAME} 상담원과 호텔 프런트 직원 간 PMS·키오스크 기술지원 통화. "
+    "객실키, 체크인, 부킹엔진, 세팅값, 템플릿, 이메일 발송."
+)
+
+
+# Whisper 한국어 일반 오인식 패턴 (도메인 무관하게 항상 보정)
+GENERAL_CORRECTIONS = [
+    ("소스텔", "호스텔"),
+    ("홈페이지 가산", "홈즈스테이 가산"),
+]
+
+
+def fix_company_name(text: str) -> str:
+    """STT 결과에서 회사명 오인식 변형들을 표준 이름으로 치환."""
+    if not text:
+        return text
+    for v in COMPANY_VARIANTS:
+        text = text.replace(v, COMPANY_NAME)
+    for wrong, correct in GENERAL_CORRECTIONS:
+        text = text.replace(wrong, correct)
+    return text
+
+
+# ────────────────────────────────────────────────────────────────
+# 호텔 이름 보정 (hotels.json 기반)
+# ────────────────────────────────────────────────────────────────
+
+def parse_filename_meta(audio_path: str) -> dict:
+    """{발신}-{수신}-{YYYYMMDDHHMMSS} 형식 파일명에서 caller_no, receiver_no, call_dt 파싱."""
+    stem = Path(audio_path).stem
+    parts = stem.split("-")
+    if len(parts) < 3:
+        return {"caller_no": None, "receiver_no": None, "call_dt": None}
+
+    # 14자리 숫자 파트를 datetime으로 인식 (인덱스 번호 등 뒤 파트 무시)
+    # 형식: {발신}-{수신}-{YYYYMMDDHHMMSS}-{index?}.mp3
+    dt_idx = None
+    for i, p in enumerate(parts):
+        if re.fullmatch(r"\d{14}", p):
+            dt_idx = i
+            break
+    if dt_idx is None or dt_idx < 2:
+        return {"caller_no": None, "receiver_no": None, "call_dt": None}
+
+    caller_no = parts[0]
+    receiver_no = "-".join(parts[1:dt_idx])
+    dt_str = parts[dt_idx]
+
+    m = re.fullmatch(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", dt_str)
+    call_dt = f"{m.group(1)}-{m.group(2)}-{m.group(3)} {m.group(4)}:{m.group(5)}:{m.group(6)}" if m else None
+
+    return {"caller_no": caller_no, "receiver_no": receiver_no, "call_dt": call_dt}
+
+
+def load_phone_lookup(json_path: str) -> dict:
+    """phone_lookup.json 로드. {digits: prop_cd} 형태. 없으면 빈 dict."""
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def find_hotel_by_phone_lookup(caller_no: str, lookup: dict, hotels: list):
+    """phone_lookup에서 발신번호 → prop_cd 조회 후 hotel 객체 반환."""
+    if not caller_no or not lookup or not hotels:
+        return None
+    digits = re.sub(r'\D', '', caller_no)
+    prop_cd = lookup.get(digits)
+    if not prop_cd:
+        return None
+    return next((h for h in hotels if h.get("propCd") == prop_cd), None)
+
+
+def load_hotels(json_path: str) -> list:
+    """hotels.json 로드. 없거나 실패하면 빈 리스트."""
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[호텔] hotels.json 로드 실패 ({json_path}): {e}")
+        return []
+
+
+def build_alias_pairs(hotels: list) -> list:
+    """alias → hotel 매핑 리스트 (긴 alias 우선 — 부분치환 오버랩 방지)."""
+    pairs = []
+    for h in hotels:
+        for alias in h.get("aliases", []):
+            if alias:
+                pairs.append((alias, h))
+    pairs.sort(key=lambda x: len(x[0]), reverse=True)
+    return pairs
+
+
+def fix_hotel_names(text: str, alias_pairs: list) -> str:
+    """STT 텍스트의 호텔명 오인식을 정식명으로 치환."""
+    if not text or not alias_pairs:
+        return text
+    for alias, hotel in alias_pairs:
+        text = text.replace(alias, hotel.get("propShrtNm", alias))
+    return text
+
+
+def find_hotel_from_text(text: str, hotels: list) -> dict:
+    """텍스트에서 호텔 매칭: 정확 → 부분 포함 → fuzzy (threshold 0.65)."""
+    if not text or not hotels:
+        return None
+
+    from difflib import SequenceMatcher
+
+    # 1단계: propShrtNm / propFullNm 정확 포함
+    for h in hotels:
+        for name in [h.get("propShrtNm", ""), h.get("propFullNm", "")]:
+            if name and name in text:
+                return h
+
+    # 2단계: aliases 정확 포함
+    for h in hotels:
+        for alias in h.get("aliases", []):
+            if alias and alias in text:
+                return h
+
+    # 3단계: fuzzy (propShrtNm 슬라이딩 윈도우)
+    best, best_score = None, 0.65
+    for h in hotels:
+        name = h.get("propShrtNm", "")
+        if not name:
+            continue
+        win_len = len(name) + 4
+        for i in range(max(1, len(text) - win_len + 1)):
+            window = text[i:i + win_len]
+            score = SequenceMatcher(None, name, window).ratio()
+            if score > best_score:
+                best_score = score
+                best = h
+    return best
+
+
+def find_hotel_by_call_no(receiver_no: str, hotels: list) -> tuple:
+    """수신번호로 호텔/컴플렉스 매칭 (cmpxReprTel + mobileNos 기준).
+    숫자만 추출해서 비교 (하이픈 등 무시).
+    반환: (matched_hotel, matched_cmpx) or (None, None).
+    """
+    if not receiver_no or not hotels:
+        return None, None
+    normalized = re.sub(r'\D', '', receiver_no)
+    if not normalized:
+        return None, None
+    for h in hotels:
+        for c in h.get('complexes', []):
+            # 대표번호 비교
+            repr_tel = re.sub(r'\D', '', c.get('cmpxReprTel', '') or '')
+            if repr_tel and repr_tel == normalized:
+                return h, c
+            # 휴대폰 번호 비교 (hotels.json 수동 편집으로 관리)
+            for mobile in c.get('mobileNos', []):
+                if re.sub(r'\D', '', mobile) == normalized:
+                    return h, c
+    return None, None
+
+
+def lookup_caller_history(caller_no: str, db_cfg: dict) -> tuple:
+    """CALL_QUEUE에서 동일 발신번호의 가장 최근 prop_cd/cmpx_cd 조회.
+    반환: (prop_cd, cmpx_cd) or (None, None).
+    """
+    if not caller_no or not db_cfg:
+        return None, None
+    try:
+        import pymysql
+        conn = pymysql.connect(**db_cfg, charset="utf8mb4", autocommit=True)
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT prop_cd, cmpx_cd FROM CALL_QUEUE
+                WHERE caller_no = %s AND prop_cd IS NOT NULL
+                ORDER BY created_dt DESC LIMIT 1
+            """, (caller_no,))
+            row = cur.fetchone()
+        conn.close()
+        if row:
+            return row[0], row[1]
+    except Exception as e:
+        print(f"[히스토리] 조회 실패: {e}")
+    return None, None
+
+
+def parse_report_fields(report: str) -> tuple:
+    """summary.report 텍스트에서 caller_nm, contact_no 파싱.
+    형식: '문의자 : XXX\n연락처: YYY\n문의내역: ...'
+    """
+    caller_nm, contact_no = None, None
+    if not report:
+        return caller_nm, contact_no
+    for line in report.splitlines():
+        m = re.match(r"문의자\s*:\s*(.+)", line)
+        if m:
+            v = m.group(1).strip()
+            caller_nm = None if v in ("미확인", "") else v
+        m = re.match(r"연락처\s*:\s*(.+)", line)
+        if m:
+            v = m.group(1).strip()
+            contact_no = None if v in ("미확인", "") else v
+    return caller_nm, contact_no
+
+
+def save_to_db(result: dict, db_cfg: dict) -> int:
+    """CALL_QUEUE에 STT 결과 INSERT. call_id 반환. 실패 시 None."""
+    try:
+        import pymysql
+    except ImportError:
+        print("[DB] pymysql 미설치 — pip install pymysql")
+        return None
+
+    summary = result.get("summary") or {}
+    stt = result.get("stt") or {}
+    report = summary.get("report", "")
+    caller_nm, contact_no = parse_report_fields(report)
+
+    row = {
+        "caller_no":      result.get("caller_no"),
+        "receiver_no":    result.get("receiver_no"),
+        "call_dt":        result.get("call_dt"),
+        "prop_cd":        result.get("prop_cd"),
+        "cmpx_cd":        result.get("cmpx_cd"),
+        "call_duration":  int(stt.get("duration_sec", 0) or 0),
+        "stt_raw":        stt.get("text"),
+        "stt_report":     report or None,
+        "stt_feedback":   summary.get("feedback"),
+        "stt_summary":    summary.get("summary"),
+        "caller_nm":      caller_nm,
+        "contact_no":     contact_no,
+        "category":       summary.get("category"),
+        "resolve_status": summary.get("status"),
+    }
+
+    sql = """
+        INSERT INTO CALL_QUEUE
+            (caller_no, receiver_no, call_dt, prop_cd, cmpx_cd, call_duration,
+             stt_raw, stt_report, stt_feedback, stt_summary,
+             caller_nm, contact_no, category, resolve_status)
+        VALUES
+            (%(caller_no)s, %(receiver_no)s, %(call_dt)s, %(prop_cd)s, %(cmpx_cd)s, %(call_duration)s,
+             %(stt_raw)s, %(stt_report)s, %(stt_feedback)s, %(stt_summary)s,
+             %(caller_nm)s, %(contact_no)s, %(category)s, %(resolve_status)s)
+        ON DUPLICATE KEY UPDATE
+            prop_cd        = VALUES(prop_cd),
+            cmpx_cd        = VALUES(cmpx_cd),
+            call_duration  = VALUES(call_duration),
+            stt_raw        = VALUES(stt_raw),
+            stt_report     = VALUES(stt_report),
+            stt_feedback   = VALUES(stt_feedback),
+            stt_summary    = VALUES(stt_summary),
+            caller_nm      = VALUES(caller_nm),
+            contact_no     = VALUES(contact_no),
+            category       = VALUES(category),
+            resolve_status = VALUES(resolve_status),
+            updated_dt     = CURRENT_TIMESTAMP
+    """
+    try:
+        conn = pymysql.connect(**db_cfg, charset="utf8mb4", autocommit=True)
+        with conn.cursor() as cur:
+            cur.execute(sql, row)
+            call_id = cur.lastrowid
+        conn.close()
+        action = "UPSERT(갱신)" if call_id == 0 else f"INSERT (call_id={call_id})"
+        print(f"[DB] CALL_QUEUE {action} 완료")
+        return call_id
+    except Exception as e:
+        print(f"[DB] UPSERT 실패: {e}")
+        return None
+
+
+def find_cmpx_from_text(text: str, hotel: dict) -> dict:
+    """호텔 complexes 중 텍스트에 언급된 것 반환 (긴 이름 우선)."""
+    if not text or not hotel:
+        return None
+    complexes = sorted(
+        hotel.get("complexes", []),
+        key=lambda c: len(c.get("cmpxNm", "")),
+        reverse=True,
+    )
+    for c in complexes:
+        nm = c.get("cmpxNm", "")
+        if nm and nm in text:
+            return c
+    return None
+
+def _build_multipart(fields: dict, filename: str, file_data: bytes) -> tuple:
+    """multipart/form-data 바디 빌더 (urllib용, 외부 라이브러리 불필요)."""
+    import uuid
+    boundary = uuid.uuid4().hex
+    body = b""
+    for name, value in fields.items():
+        body += (f"--{boundary}\r\n"
+                 f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                 f"{value}\r\n").encode("utf-8")
+    body += (f"--{boundary}\r\n"
+             f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+             f"Content-Type: audio/mpeg\r\n\r\n").encode("utf-8")
+    body += file_data + b"\r\n"
+    body += f"--{boundary}--\r\n".encode("utf-8")
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+def transcribe_groq(audio_path: str) -> dict:
+    """Groq Whisper API로 STT — CPU 부하 없음, 5분 통화 → 약 10초."""
+    print(f"[STT-Groq] 전송 중: {audio_path}")
+    t0 = time.time()
+
+    with open(audio_path, "rb") as f:
+        file_data = f.read()
+
+    fields = {
+        "model": GROQ_STT_MODEL,
+        "language": "ko",
+        "response_format": "verbose_json",
+        "prompt": WHISPER_INITIAL_PROMPT,
+    }
+    body, content_type = _build_multipart(fields, os.path.basename(audio_path), file_data)
+
+    req = urllib.request.Request(
+        GROQ_STT_URL,
+        method="POST",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": content_type,
+            "User-Agent": "Mozilla/5.0",  # Cloudflare 차단 우회
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            res = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        sys.exit(f"❌ Groq STT 실패 HTTP {e.code}: {e.read().decode()[:300]}")
+
+    elapsed = time.time() - t0
+    duration = res.get("duration", 0)
+    segments_raw = res.get("segments", [])
+
+    # 오인식 보정 + 로컬 faster-whisper와 동일한 포맷으로 변환
+    segments = []
+    full_text_parts = []
+    for seg in segments_raw:
+        corrected = fix_company_name(seg.get("text", "").strip())
+        segments.append({
+            "start": round(seg.get("start", 0), 2),
+            "end": round(seg.get("end", 0), 2),
+            "text": corrected,
+        })
+        full_text_parts.append(corrected)
+
+    print(f"[STT-Groq] 완료: 음성 {duration:.1f}초 → 처리 {elapsed:.1f}초 · {len(segments)}개 세그먼트")
+
+    return {
+        "text": " ".join(full_text_parts),
+        "segments": segments,
+        "duration_sec": duration,
+        "language": res.get("language", "ko"),
+        "language_probability": 1.0,  # Groq는 신뢰도 미제공
+    }
+
+
+SUMMARIZE_SYSTEM_PROMPT = """너는 호텔 PMS 상담 통화 모노 녹취록을 분석하는 전문가야.
+
+[중요 컨텍스트]
+- **"다올 비전"** 이 자사(상담 제공자) 이름이야. STT가 이걸 "다월 기자", "다홀 기자", "다월 비전" 등으로 잘못 인식했을 수 있는데, 그런 표현이 보이면 모두 **다올 비전**으로 간주해.
+- 다올 비전 상담원 = 호텔 PMS·키오스크 기술지원 담당 (수신측).
+- 호텔 프런트 직원 = 장애·설정 문의로 전화한 쪽 (발신측).
+
+모노 녹음이라 발신자/수신자가 하나의 오디오에 섞여 있어.
+대화 맥락(인사말, 문의 시작, 높임말 톤, 질문-답변 패턴)을 보고 **A/B 두 화자로 추정 분리**하고 구조화된 분석을 만들어.
+
+[입력]
+타임스탬프가 붙은 STT 전사 세그먼트들.
+
+[출력 — 순수 JSON. 설명·마크다운 금지]
+{
+  "report": "⭐ KOK_CALL_MNTR.REPORT에 저장될 값. 아래 형식을 정확히 따를 것 (줄바꿈 포함):\n문의자 : [발신자의 담당자명 또는 부서명. 호텔명은 절대 쓰지 말 것 (호텔은 별도 관리). 예: '프런트 담당자', '예약실', '김철수 대리'. 파악 안 되면 '미확인']\n연락처: [통화에서 언급된 전화번호. 없으면 '미확인'. 개인 핸드폰은 010-****-NNNN 형태로 마스킹]\n문의내역: [발신자 문의 내용을 사실 위주 2~4줄 서술. 상황·증상·요청 포함. 상담원 답변 내용 섞지 마. 호실번호·예약번호 등 PII 제거]",
+  "feedback": "⭐ 상담원이 제공한 답변·조치·후속안내를 통합해 KOK_CALL_MNTR.FEEDBACK 컬럼에 바로 넣을 수 있는 서술형 2~4줄. 예: '세팅값 확인 결과 일부 설정 누락. 수정 후 재전송 안내. 추후 공지사항으로 안내 예정.'",
+  "speaker_A": "역할 추정 (예: '다올 비전 상담원 (수신측)')",
+  "speaker_B": "역할 추정 (예: '홈즈스테이 예약실 직원 (발신측)')",
+  "dialogue": [
+    {"speaker": "A", "start": 0.0, "text": "정리된 발화"},
+    {"speaker": "B", "start": 3.5, "text": "..."}
+  ],
+  "inquirer": "A" or "B",
+  "responder": "A" or "B",
+  "question": "발신자의 핵심 문의 (50자 이내, 의문문)",
+  "context": "질문 배경·상황 (1-2줄)",
+  "answer_given": "상담원이 제공한 답변·조치 (없으면 '답변 보류')",
+  "actions_taken": ["실제 취해진 조치 리스트"],
+  "follow_up": "이후 처리 예정 사항 (없으면 '없음')",
+  "status": "해결됨 / 처리중 / 추가조사 필요 / 미확인 중 하나",
+  "category": "키오스크 / 객실키 / 결제·카드 / 체크인 / PMS기능 / 부킹엔진 / 소모품·시재 / 기타 중 하나",
+  "summary": "3줄 이내 한국어 요약"
+}
+
+[report·feedback 필드 지침]
+- **report**: 반드시 아래 3줄 형식 유지. DB에 그대로 저장됨.
+  ```
+  문의자 : 홈즈스테이 예약실
+  연락처: 미확인
+  문의내역: 부킹엔진 판매 페이지에 신규 패키지 상품 설명란 미노출. 수원·가산 지점만 해당.
+  ```
+- **feedback**: 상담원이 실제로 말한 조치·답변·안내만. 문의자 발화 섞지 마. 상담원 답변이 없거나 보류면 '답변 보류 — 확인 후 재연락 예정' 식으로.
+- 두 필드만 있어도 **원본 상담 기록을 재구성**할 수 있어야 함 (나머지 필드는 분석·검색용).
+
+[규칙]
+1. **dialogue는 대화 흐름을 보여주는 핵심 턴 5~15개로 축약**. 입력 세그먼트가 50개든 100개든 전부 담지 마. 긴 발화는 1~2줄로 요약해서 화자별 핵심 의도만 남기고, 단순 맞장구("네네")는 생략.
+   ⚠️ **dialogue가 너무 길면 뒤 분석 필드(question/summary 등) 토큰 부족해서 잘림 — 반드시 축약.**
+2. 화자 판별 단서:
+   - 전화 건 쪽 = 인사말 뒤 곧바로 용건 꺼냄 ("홈즈스테이 예약실인데요", "저희가 뭐 여쭤볼 게 있어서")
+   - 받은 쪽 = 회사명 짧게 밝힘 ("다월입니다"), 질문 주도 ("어떤 상품일까요?")
+3. **PII 제거 또는 일반화**: 구체 호실번호(410호 같은), 전화번호, 예약번호, 사람 이름. 호텔 브랜드명은 역할 추정용 한 번만 사용 후 이후엔 '해당 업장' 등으로 일반화 가능.
+4. STT 인식 오류 가능성 — 문맥으로 판단해 자연스럽게 정리. 단, 없는 내용은 지어내지 마.
+5. 불명확한 부분은 "미확인"으로.
+6. **question, answer_given, summary, category, status 등 모든 분석 필드는 반드시 채워**. "(미확인)"은 정말 파악 안 될 때만 사용.
+7. question / answer_given 은 각각 **inquirer / responder 발화에 근거**해 작성."""
+
+
+# ────────────────────────────────────────────────────────────────
+# 1. STT — Faster-Whisper
+# ────────────────────────────────────────────────────────────────
+
+def transcribe(audio_path: str, model_size: str = "medium",
+               device: str = "cpu", compute_type: str = "int8") -> dict:
+    """mp3 파일을 Whisper로 STT 처리.
+
+    Returns:
+        {"text": 전체 텍스트, "segments": 타임스탬프별 세그먼트, "duration": 음성 길이}
+    """
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:
+        sys.exit("❌ faster-whisper 미설치: pip install -r requirements.txt")
+
+    print(f"[STT] 모델 로드 중... (size={model_size}, device={device}, compute_type={compute_type})")
+    print(f"      ※ 첫 실행 시 모델 다운로드 — medium은 약 1.5GB")
+    t0 = time.time()
+    model = WhisperModel(model_size, device=device, compute_type=compute_type)
+    print(f"[STT] 모델 로드 완료 ({time.time()-t0:.1f}초)")
+
+    print(f"[STT] 전사 시작: {audio_path}")
+    t0 = time.time()
+    segments, info = model.transcribe(
+        audio_path,
+        language="ko",
+        beam_size=5,
+        vad_filter=True,  # 무음 구간 스킵 → 속도 향상
+        vad_parameters=dict(min_silence_duration_ms=500),
+        initial_prompt=WHISPER_INITIAL_PROMPT,  # 고유명사 힌트 → 오인식 감소
+    )
+
+    # segments는 generator → 소비하면서 수집. 동시에 회사명 오인식 교정.
+    seg_list = []
+    full_text_parts = []
+    for seg in segments:
+        corrected = fix_company_name(seg.text.strip())
+        seg_list.append({
+            "start": round(seg.start, 2),
+            "end": round(seg.end, 2),
+            "text": corrected,
+        })
+        full_text_parts.append(corrected)
+
+    elapsed = time.time() - t0
+    duration = info.duration
+    print(f"[STT] 완료: 음성 {duration:.1f}초 → 처리 {elapsed:.1f}초 "
+          f"(x{elapsed/duration:.1f} 실시간 배속) · {len(seg_list)}개 세그먼트")
+
+    return {
+        "text": " ".join(full_text_parts),
+        "segments": seg_list,
+        "duration_sec": duration,
+        "language": info.language,
+        "language_probability": round(info.language_probability, 3),
+    }
+
+
+# ────────────────────────────────────────────────────────────────
+# 2. 요약 — Groq
+# ────────────────────────────────────────────────────────────────
+
+def summarize(segments: list, timeout: int = 60) -> dict:
+    """STT 세그먼트(타임스탬프 포함) → 화자 분리 대화록 + 구조화 요약 JSON."""
+    if not segments:
+        return {"error": "빈 세그먼트"}
+
+    # 타임스탬프 붙인 입력 만들기 (LLM이 화자 판별에 활용)
+    lines = []
+    for seg in segments:
+        start = seg.get("start", 0)
+        mmss = f"{int(start // 60):d}:{int(start % 60):02d}"
+        lines.append(f"[{mmss}] {seg.get('text', '').strip()}")
+    user_input = "\n".join(lines)
+
+    body = {
+        "model": GROQ_MODEL,
+        "messages": [
+            {"role": "system", "content": SUMMARIZE_SYSTEM_PROMPT},
+            {"role": "user", "content": user_input},
+        ],
+        "max_tokens": 4000,   # dialogue + 모든 분석 필드 담기 위해 넉넉히
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+    }
+
+    req = urllib.request.Request(
+        GROQ_URL,
+        method="POST",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0",  # Cloudflare 차단 우회
+        },
+    )
+
+    print(f"[요약] Groq 호출 (세그먼트 {len(segments)}개, 입력 {len(user_input)}자)...")
+    t0 = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            res = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")[:500]
+        return {"error": f"HTTP {e.code}: {err_body}"}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+    elapsed = time.time() - t0
+    print(f"[요약] 완료 ({elapsed:.1f}초)")
+
+    content = res["choices"][0]["message"]["content"]
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"error": "JSON 파싱 실패", "raw": content}
+
+
+# ────────────────────────────────────────────────────────────────
+# 3. 결과 리포트 (사람용 마크다운)
+# ────────────────────────────────────────────────────────────────
+
+def save_markdown_report(md_path: str, audio_filename: str,
+                         stt: dict, summary: dict | None) -> None:
+    """JSON 옆에 사람이 읽기 편한 .md 리포트 저장."""
+    import datetime
+
+    L = []
+    L.append(f"# 통화 분석 리포트")
+    L.append("")
+    L.append(f"- **파일**: `{audio_filename}`")
+    L.append(f"- **처리 일시**: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    duration = stt.get("duration_sec", 0)
+    L.append(f"- **음성 길이**: {duration:.1f}초 ({int(duration // 60)}분 {int(duration % 60)}초)")
+    L.append(f"- **언어 인식**: {stt.get('language', 'ko')} "
+             f"(신뢰도 {stt.get('language_probability', 0) * 100:.1f}%)")
+    L.append("")
+
+    # 빈 값 표시 헬퍼 (비어있어도 항상 드러내 판단 가능하게)
+    def _show(v, empty_mark="_(비어있음)_"):
+        if v is None: return empty_mark
+        if isinstance(v, str) and not v.strip(): return empty_mark
+        if isinstance(v, list) and not v: return empty_mark
+        return v
+
+    if summary and "error" not in summary:
+        # ⭐ 핵심 2필드 (DB 직결 — 최상단 큰 블록)
+        L.append("---")
+        L.append("## 📋 문의 내용 (REPORT)")
+        L.append("")
+        L.append(f"> {_show(summary.get('report'))}")
+        L.append("")
+        L.append("## 💬 피드백 (FEEDBACK)")
+        L.append("")
+        L.append(f"> {_show(summary.get('feedback'))}")
+        L.append("")
+        L.append("---")
+        L.append("> 아래는 상세 분석 — 품질 검증용")
+        L.append("")
+
+        # 🎭 화자
+        L.append("---")
+        L.append("## 🎭 화자 추정")
+        L.append(f"- **speaker_A**: {_show(summary.get('speaker_A'))}")
+        L.append(f"- **speaker_B**: {_show(summary.get('speaker_B'))}")
+        L.append(f"- **inquirer (문의자)**: {_show(summary.get('inquirer'))}")
+        L.append(f"- **responder (응대자)**: {_show(summary.get('responder'))}")
+        L.append("")
+
+        # ❓ 문의
+        L.append("---")
+        L.append("## ❓ 핵심 문의")
+        L.append(f"> {_show(summary.get('question'))}")
+        L.append("")
+        L.append(f"**context (배경)**: {_show(summary.get('context'))}")
+        L.append("")
+
+        # 💡 응대
+        L.append("---")
+        L.append("## 💡 응대")
+        L.append(f"> {_show(summary.get('answer_given'))}")
+        L.append("")
+        actions = summary.get("actions_taken") or []
+        L.append("**actions_taken (취한 조치)**:")
+        if actions:
+            for a in actions:
+                L.append(f"- {a}")
+        else:
+            L.append("- _(비어있음)_")
+        L.append("")
+        L.append(f"**follow_up (이후 처리)**: {_show(summary.get('follow_up'))}")
+        L.append("")
+
+        # 상태·카테고리
+        L.append(f"**status**: `{_show(summary.get('status'))}` · "
+                 f"**category**: `{_show(summary.get('category'))}`")
+        L.append("")
+
+        # 📝 요약
+        L.append("---")
+        L.append("## 📝 한 줄 요약")
+        L.append(f"{_show(summary.get('summary'))}")
+        L.append("")
+
+        # 💬 대화록
+        dialogue = summary.get("dialogue") or []
+        L.append("---")
+        L.append(f"## 💬 화자 분리 대화록 ({len(dialogue)}줄)")
+        L.append("")
+        if dialogue:
+            L.append("| 시각 | 화자 | 발화 |")
+            L.append("|------|------|------|")
+            for d in dialogue:
+                start = d.get("start", 0)
+                mmss = f"{int(start // 60):d}:{int(start % 60):02d}"
+                spk = d.get("speaker", "?")
+                text = str(d.get("text", "")).replace("|", "\\|").replace("\n", " ")
+                L.append(f"| {mmss} | **{spk}** | {text} |")
+        else:
+            L.append("_(비어있음)_")
+        L.append("")
+
+        # 🔍 전체 필드 덤프 — 품질 판단용 (예상 외 필드·누락 모두 드러남)
+        L.append("---")
+        L.append("## 🔍 전체 필드 점검 (품질 평가용)")
+        L.append("")
+        L.append("| 필드 | 값 길이 | 미리보기 |")
+        L.append("|------|---------|----------|")
+        for k, v in summary.items():
+            if k == "dialogue":
+                sz = len(v) if isinstance(v, list) else 0
+                preview = f"{sz}개 턴"
+            elif isinstance(v, list):
+                sz = len(v)
+                preview = ", ".join(str(x)[:40] for x in v[:3]) + (" ..." if sz > 3 else "")
+            else:
+                sv = str(v) if v is not None else ""
+                sz = len(sv)
+                preview = sv[:80].replace("|", "\\|").replace("\n", " ")
+                if sz > 80: preview += " ..."
+            L.append(f"| `{k}` | {sz} | {preview if preview else '_(비어있음)_'} |")
+        L.append("")
+
+        # 📦 Raw JSON (summary 전체) — 100% 검증용
+        L.append("---")
+        L.append("## 📦 Raw JSON (summary 원본)")
+        L.append("")
+        L.append("<details>")
+        L.append("<summary>펼쳐 보기 (LLM 반환 JSON 그대로)</summary>")
+        L.append("")
+        L.append("```json")
+        L.append(json.dumps(summary, ensure_ascii=False, indent=2))
+        L.append("```")
+        L.append("")
+        L.append("</details>")
+        L.append("")
+    elif summary and "error" in summary:
+        L.append("---")
+        L.append("## ⚠️ 요약 실패")
+        L.append(f"```\n{summary.get('error', '')}\n```")
+        L.append("")
+        if "raw" in summary:
+            L.append("### LLM 원문 응답")
+            L.append("```")
+            L.append(summary["raw"])
+            L.append("```")
+            L.append("")
+
+    # 📜 원본 전사 (접기)
+    L.append("---")
+    L.append("## 📜 원본 전사 (STT 출력 그대로)")
+    L.append("")
+    L.append("<details>")
+    L.append("<summary>펼쳐 보기 (STT 원문, 정제 전)</summary>")
+    L.append("")
+    L.append("```")
+    L.append(stt.get("text", ""))
+    L.append("```")
+    L.append("")
+    L.append("</details>")
+    L.append("")
+
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(L))
+
+
+# ────────────────────────────────────────────────────────────────
+# 4. 메인 파이프라인
+# ────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="호텔 통화 녹음(.mp3) → STT → 요약",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument("audio", help="입력 음성 파일 (.mp3 / .wav / .m4a)")
+    parser.add_argument("--stt-provider", default="groq",
+                        choices=["groq", "local"],
+                        help="STT 제공자: groq(기본, 빠름/무료) or local(faster-whisper, CPU)")
+    parser.add_argument("--model", default="medium",
+                        choices=["tiny", "base", "small", "medium", "large-v3"],
+                        help="[local 전용] Whisper 모델 크기 (기본 medium)")
+    parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"],
+                        help="cpu 또는 cuda (GPU)")
+    parser.add_argument("--compute-type", default="int8",
+                        choices=["int8", "float16", "float32"],
+                        help="연산 정밀도 (cpu는 int8 권장)")
+    parser.add_argument("--output", help="결과 JSON 저장 경로 (생략 시 <audio>.json)")
+    parser.add_argument("--no-summary", action="store_true",
+                        help="Groq 요약 스킵 — STT만")
+    parser.add_argument("--hotels", default=None,
+                        help="hotels.json 경로 (호텔명 보정·prop_cd 추출용). "
+                             "생략 시 스크립트 상위 폴더에서 자동 탐색.")
+    parser.add_argument("--save-db", action="store_true",
+                        help="처리 완료 후 로컬 MariaDB(CALL_QUEUE)에 저장")
+    parser.add_argument("--db-host",     default=DB_DEFAULT["host"])
+    parser.add_argument("--db-port",     default=DB_DEFAULT["port"], type=int)
+    parser.add_argument("--db-user",     default=DB_DEFAULT["user"])
+    parser.add_argument("--db-password", default=DB_DEFAULT["password"])
+    parser.add_argument("--db-name",     default=DB_DEFAULT["database"])
+    args = parser.parse_args()
+
+    # DB 설정 (히스토리 조회 + 저장 공통 사용)
+    db_cfg = {
+        "host":     args.db_host,
+        "port":     args.db_port,
+        "user":     args.db_user,
+        "password": args.db_password,
+        "database": args.db_name,
+    } if args.save_db else None
+
+    audio_path = args.audio
+    if not os.path.exists(audio_path):
+        sys.exit(f"❌ 파일 없음: {audio_path}")
+
+    # 파일명에서 caller_no, receiver_no, call_dt 자동 파싱 ({발신}_{수신}_{YYYYMMDDHHMMSS})
+    file_meta = parse_filename_meta(audio_path)
+    caller_no = file_meta["caller_no"]
+    receiver_no = file_meta["receiver_no"]
+    call_dt = file_meta["call_dt"]
+    print(f"[메타] caller_no={caller_no}, receiver_no={receiver_no}, call_dt={call_dt}")
+
+    # hotels.json 탐색: 명시 경로 → 스크립트 상위 폴더 자동 탐색
+    hotels_path = args.hotels
+    if not hotels_path:
+        auto = Path(__file__).parent.parent / "data" / "hotels.json"
+        if auto.exists():
+            hotels_path = str(auto)
+    hotels = load_hotels(hotels_path) if hotels_path else []
+    alias_pairs = build_alias_pairs(hotels)
+    if hotels:
+        print(f"[호텔] {len(hotels)}개 호텔 로드 완료 (aliases {sum(len(h.get('aliases',[])) for h in hotels)}개)")
+
+    # phone_lookup.json 로드 (hotels.json 옆에 있다고 가정)
+    phone_lookup = {}
+    if hotels_path:
+        lookup_path = str(Path(hotels_path).parent / "phone_lookup.json")
+        phone_lookup = load_phone_lookup(lookup_path)
+        if phone_lookup:
+            print(f"[전화] phone_lookup 로드 완료: {len(phone_lookup)}개 번호")
+
+    # 기본 저장 위치: 스크립트 옆의 results/ 폴더
+    if args.output:
+        output_path = args.output
+    else:
+        script_dir = Path(__file__).parent
+        results_dir = script_dir / "results"
+        results_dir.mkdir(exist_ok=True)
+        output_path = str(results_dir / (Path(audio_path).stem + ".json"))
+
+    # 출력 디렉토리 보장
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Step 1 — STT
+    if args.stt_provider == "groq":
+        stt_result = transcribe_groq(audio_path)
+    else:
+        stt_result = transcribe(
+            audio_path,
+            model_size=args.model,
+            device=args.device,
+            compute_type=args.compute_type,
+        )
+
+    # Step 1.5 — 호텔명 오인식 보정 (STT 텍스트 전체)
+    if alias_pairs:
+        stt_result["text"] = fix_hotel_names(stt_result["text"], alias_pairs)
+        for seg in stt_result.get("segments", []):
+            seg["text"] = fix_hotel_names(seg["text"], alias_pairs)
+        print(f"[호텔] STT 텍스트 호텔명 보정 완료")
+
+    # Step 2 — 화자 분리 + 요약 (optional)
+    summary = None
+    if not args.no_summary:
+        summary = summarize(stt_result["segments"])
+    else:
+        print("[요약] 스킵 (--no-summary)")
+
+    # Step 2.5 — prop_cd / cmpx_cd 추출 (수신번호 우선 → 텍스트 폴백)
+    prop_cd, cmpx_cd = None, None
+    if hotels:
+        matched_hotel = None
+        # 0순위: 파일명 수신번호 → cmpxReprTel / mobileNos 직접 매칭 (가장 정확)
+        matched_hotel, matched_cmpx = find_hotel_by_call_no(receiver_no, hotels)
+        if matched_hotel:
+            prop_cd = matched_hotel.get("propCd")
+            cmpx_cd = matched_cmpx.get("cmpxCd") if matched_cmpx else None
+            print(f"[호텔] 수신번호 매칭: {matched_hotel.get('propShrtNm')} (prop_cd={prop_cd}, cmpx_cd={cmpx_cd})")
+
+        # 1순위: phone_lookup.json (KOK_CALL_MNTR 연락처 파싱 기반) — 발신·수신 둘 다 조회
+        if not matched_hotel and phone_lookup:
+            matched_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
+            if matched_hotel:
+                prop_cd = matched_hotel.get("propCd")
+                print(f"[호텔] phone_lookup 매칭(발신): {matched_hotel.get('propShrtNm')} (prop_cd={prop_cd})")
+        if not matched_hotel and phone_lookup and receiver_no:
+            matched_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
+            if matched_hotel:
+                prop_cd = matched_hotel.get("propCd")
+                print(f"[호텔] phone_lookup 매칭(수신): {matched_hotel.get('propShrtNm')} (prop_cd={prop_cd})")
+
+        # 2순위: 발신번호 히스토리 (이전 통화에서 매칭된 prop_cd 재사용)
+        if not matched_hotel and caller_no and args.save_db:
+            hist_prop, hist_cmpx = lookup_caller_history(caller_no, db_cfg)
+            if hist_prop:
+                prop_cd = hist_prop
+                cmpx_cd = hist_cmpx
+                matched_hotel = next((h for h in hotels if h.get("propCd") == prop_cd), None)
+                print(f"[호텔] 발신번호 히스토리 매칭: prop_cd={prop_cd}, cmpx_cd={cmpx_cd}")
+
+        # 2순위: 텍스트에서 호텔명 검색
+        if not matched_hotel and summary and "error" not in summary:
+            search_text = " ".join(filter(None, [
+                summary.get("speaker_B", ""),
+                summary.get("report", ""),
+                stt_result.get("text", "")[:500],
+            ]))
+            matched_hotel = find_hotel_from_text(search_text, hotels)
+            if matched_hotel:
+                prop_cd = matched_hotel.get("propCd")
+                matched_cmpx = find_cmpx_from_text(search_text, matched_hotel)
+                if matched_cmpx:
+                    cmpx_cd = matched_cmpx.get("cmpxCd")
+                print(f"[호텔] 텍스트 매칭: {matched_hotel.get('propShrtNm')} (prop_cd={prop_cd}, cmpx_cd={cmpx_cd})")
+
+        # complex가 1개뿐이면 cmpx_cd 자동 채우기
+        if matched_hotel and cmpx_cd is None:
+            complexes = matched_hotel.get("complexes", [])
+            if len(complexes) == 1:
+                cmpx_cd = complexes[0].get("cmpxCd")
+                print(f"[호텔] 단일 complex 자동 채움: cmpx_cd={cmpx_cd}")
+        if not matched_hotel:
+            print("[호텔] 매칭 실패 — prop_cd=null (상담사가 UI에서 선택 필요)")
+
+    # 결과 조합
+    result = {
+        "audio_file": os.path.basename(audio_path),
+        "caller_no": caller_no,
+        "receiver_no": receiver_no,
+        "call_dt": call_dt,
+        "prop_cd": prop_cd,
+        "cmpx_cd": cmpx_cd,
+        "stt": stt_result,
+        "summary": summary,
+    }
+
+    # JSON 저장
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"\n✅ JSON 저장: {output_path}")
+
+    # DB 저장 (--save-db 옵션)
+    if args.save_db:
+        call_id = save_to_db(result, db_cfg)
+        if call_id:
+            result["call_id"] = call_id
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+
+    # MD 리포트 저장 (사람이 읽기 편한 버전, 주석 대체)
+    md_path = str(Path(output_path).with_suffix(".md"))
+    save_markdown_report(md_path, os.path.basename(audio_path), stt_result, summary)
+    print(f"✅ MD 리포트: {md_path}")
+
+    # 간단한 사람용 출력
+    print("\n" + "=" * 60)
+    print("📝 전사 텍스트 (처음 500자):")
+    print("=" * 60)
+    print(stt_result["text"][:500] + ("..." if len(stt_result["text"]) > 500 else ""))
+
+    if summary and "error" not in summary:
+        # ⭐ 핵심 2필드 (DB 직결)
+        print("\n" + "=" * 60)
+        print("📋 문의 내용 (REPORT):")
+        print("=" * 60)
+        print(f"  {summary.get('report', '(비어있음)')}")
+        print("\n" + "=" * 60)
+        print("💬 피드백 (FEEDBACK):")
+        print("=" * 60)
+        print(f"  {summary.get('feedback', '(비어있음)')}")
+
+        # 화자 역할 표시
+        print("\n" + "=" * 60)
+        print("🎭 화자 추정:")
+        print("=" * 60)
+        if "speaker_A" in summary: print(f"  A = {summary['speaker_A']}")
+        if "speaker_B" in summary: print(f"  B = {summary['speaker_B']}")
+        if "inquirer" in summary: print(f"  문의자 (inquirer): {summary['inquirer']}")
+        if "responder" in summary: print(f"  응대자 (responder): {summary['responder']}")
+
+        # 화자 분리 대화록
+        dialogue = summary.get("dialogue", [])
+        if dialogue:
+            print("\n" + "=" * 60)
+            print(f"💬 화자 분리 대화록 ({len(dialogue)}줄):")
+            print("=" * 60)
+            for d in dialogue[:20]:
+                spk = d.get("speaker", "?")
+                start = d.get("start", 0)
+                mmss = f"{int(start // 60):d}:{int(start % 60):02d}"
+                text = d.get("text", "")
+                print(f"  [{mmss}] {spk}: {text}")
+            if len(dialogue) > 20:
+                print(f"  ... (전체 {len(dialogue)}줄, 결과 JSON 파일 참조)")
+
+        # 구조화 분석
+        print("\n" + "=" * 60)
+        print("📋 구조화 분석:")
+        print("=" * 60)
+        for k in ["question", "context", "answer_given", "status", "category", "summary"]:
+            if k in summary:
+                print(f"  {k}: {summary[k]}")
+        for k in ["actions_taken"]:
+            if k in summary and summary[k]:
+                print(f"  {k}:")
+                for item in summary[k]:
+                    print(f"    - {item}")
+        if summary.get("follow_up") and summary["follow_up"] != "없음":
+            print(f"  follow_up: {summary['follow_up']}")
+    elif summary and "error" in summary:
+        print(f"\n⚠️ 요약 실패: {summary['error']}")
+        if "raw" in summary:
+            print(f"   원문 일부: {summary['raw'][:200]}")
+
+
+if __name__ == "__main__":
+    main()

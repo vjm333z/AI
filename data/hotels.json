@@ -1,0 +1,2685 @@
+[ {
+  "propCd" : "0000000056",
+  "propShrtNm" : "해마호텔",
+  "propFullNm" : "해마호텔",
+  "complexes" : [ {
+    "propCd" : "0000000056",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "해마호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647664000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "해마 호텔", "헤마호텔", "헤마 호텔" ]
+}, {
+  "propCd" : "0000000177",
+  "propShrtNm" : "의료법인 성광의료재단",
+  "propFullNm" : "의료법인 성광의료재단",
+  "complexes" : [ {
+    "propCd" : "0000000177",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "마티네차움",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0234681801",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "성광의료재단", "마티네차움", "마티네 차움", "성광 의료재단", "마티 네 차움" ]
+}, {
+  "propCd" : "0000000055",
+  "propShrtNm" : "제주푸른호텔",
+  "propFullNm" : "제주푸른호텔",
+  "complexes" : [ {
+    "propCd" : "0000000055",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "제주푸른호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647392000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "제주 푸른 호텔", "제주 푸른호텔", "제주 푸린호텔" ]
+}, {
+  "propCd" : "0000000176",
+  "propShrtNm" : "㈜호텔에이치엘비",
+  "propFullNm" : "㈜호텔에이치엘비",
+  "complexes" : [ {
+    "propCd" : "0000000176",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "HOTEL HLB",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0518532290",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "호텔에이치엘비", "호텔 에이치엘비", "HLB", "에이치엘비", "에이치 엘비", "HOTEL HLB" ]
+}, {
+  "propCd" : "0000000058",
+  "propShrtNm" : "ORAKAI",
+  "propFullNm" : "ORAKAI",
+  "complexes" : [ {
+    "propCd" : "0000000058",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "ORAKAI CHEONGGYESAN HOTEL",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0262007300",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000058",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "ORAKAI DAEHAKRO HOTEL",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0263537700",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000058",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "ORAKAI INSADONG SUITES",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0262628888",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000058",
+    "cmpxCd" : "00004",
+    "cmpxNm" : "ORAKAI SONGDO PARK HOTEL",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0322107000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "오라카이", "오라 카이", "오라카이 호텔", "오락카이", "오라케이", "오라 케이" ]
+}, {
+  "propCd" : "0000000179",
+  "propShrtNm" : "유닛제이호스텔",
+  "propFullNm" : "유닛제이호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000179",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "유닛제이호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01083534929",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "유닛 제이 호스텔", "유닛제이 호스텔", "유닛 제이" ]
+}, {
+  "propCd" : "0000000057",
+  "propShrtNm" : "골드코스트호텔인천",
+  "propFullNm" : "골드코스트호텔인천",
+  "complexes" : [ {
+    "propCd" : "0000000057",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "골드코스트호텔인천",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0324395800",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "골드코스트 호텔", "골드 코스트 호텔", "골드코스트", "골드 코스트" ]
+}, {
+  "propCd" : "0000000178",
+  "propShrtNm" : "유닛엠호스텔",
+  "propFullNm" : "유닛엠호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000178",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "유닛엠호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07048700009",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "유닛 엠 호스텔", "유닛 엠" ]
+}, {
+  "propCd" : "0000000059",
+  "propShrtNm" : "써미트스테이",
+  "propFullNm" : "써미트스테이",
+  "complexes" : [ {
+    "propCd" : "0000000059",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "(주)써미트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0632446400",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "써미트 스테이", "서미트스테이", "서미트 스테이", "써미트", "서밋 스테이", "서밋스테이", "씨미트", "(주)써미트" ]
+}, {
+  "propCd" : "0000000180",
+  "propShrtNm" : "유닛디호스텔",
+  "propFullNm" : "유닛디호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000180",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "유닛디호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01057042022",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "유닛 디 호스텔", "유닛 디" ]
+}, {
+  "propCd" : "0000000061",
+  "propShrtNm" : "더 시에나",
+  "propFullNm" : "더 시에나",
+  "complexes" : [ {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "토스카나호텔(구)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647357000",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "더 시에나 리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647357100",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "토스카나호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647357000",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00004",
+    "cmpxNm" : "더 시에나 제주 컨트리클럽",
+    "cmpxTp" : "G",
+    "cmpxReprTel" : "0647022999",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00005",
+    "cmpxNm" : "시에나청담라운지",
+    "cmpxTp" : "O",
+    "cmpxReprTel" : "0200000000",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00006",
+    "cmpxNm" : "더 시에나 프리모",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647357000",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00007",
+    "cmpxNm" : "더 시에나 서울 컨트리클럽",
+    "cmpxTp" : "G",
+    "cmpxReprTel" : "0317608115",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000061",
+    "cmpxCd" : "00008",
+    "cmpxNm" : "더 시에나 벨루토 컨트리클럽",
+    "cmpxTp" : "G",
+    "cmpxReprTel" : "0318878700",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "시에나", "더시에나", "토스카나", "시에나 리조트", "더 시에 나", "시에 나", "시에나호텔" ]
+}, {
+  "propCd" : "0000000182",
+  "propShrtNm" : "클라우드웨스트호스피탈리티",
+  "propFullNm" : "클라우드웨스트호스피탈리티",
+  "complexes" : [ {
+    "propCd" : "0000000182",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "온심재",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01095459654",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "클라우드웨스트", "클라우드 웨스트", "온심재", "클라우드 웨스트 호스피탈리티" ]
+}, {
+  "propCd" : "0000000060",
+  "propShrtNm" : "강릉씨티호텔",
+  "propFullNm" : "강릉씨티호텔",
+  "complexes" : [ {
+    "propCd" : "0000000060",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "강릉씨티호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336558700",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "강릉 씨티 호텔", "강릉 시티 호텔", "강릉시티호텔", "강릉 씨디 호텔", "강릉 시디 호텔" ]
+}, {
+  "propCd" : "0000000181",
+  "propShrtNm" : "에이치엘비에프앤비 주식회사",
+  "propFullNm" : "에이치엘비에프앤비 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000181",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔 홍삼빌",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "16613889",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에이치엘비에프앤비", "홍삼빌", "호텔 홍삼빌", "에이치 엘비 에프앤비" ]
+}, {
+  "propCd" : "0000000063",
+  "propShrtNm" : "영동대학교",
+  "propFullNm" : "강릉영동대학교",
+  "complexes" : [ {
+    "propCd" : "0000000063",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "강릉영동대학교",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336100114",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "강릉영동대학교", "영동대", "강릉영동대", "영동 대학교" ]
+}, {
+  "propCd" : "0000000184",
+  "propShrtNm" : "주식회사 팔라티움",
+  "propFullNm" : "주식회사 팔라티움",
+  "complexes" : [ {
+    "propCd" : "0000000184",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "팔라티움 해운대",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0517107630",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "팔라티움", "팔라티움 해운대", "팔라 티움", "팔라티움해운대" ]
+}, {
+  "propCd" : "0000000062",
+  "propShrtNm" : "(주)제주호텔더엠",
+  "propFullNm" : "제주호텔더엠 ",
+  "complexes" : [ {
+    "propCd" : "0000000062",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "제주호텔더엠 ",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647356000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "제주호텔더엠", "더엠", "더 엠", "제주 더엠", "제주 호텔 더 엠", "더엠호텔" ]
+}, {
+  "propCd" : "0000000183",
+  "propShrtNm" : "스태이링크",
+  "propFullNm" : "스태이링크",
+  "complexes" : [ {
+    "propCd" : "0000000183",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "스태이링크",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07041342311",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "스테이링크", "스태이 링크", "스테이 링크", "스테이 링그", "스태이링그" ]
+}, {
+  "propCd" : "0000000065",
+  "propShrtNm" : "(주)빌텍",
+  "propFullNm" : "모비딕",
+  "complexes" : [ {
+    "propCd" : "0000000065",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "모비딕 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01043821157",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "모비딕", "모비딕 호텔", "모비 딕", "모비딬", "모비 딬" ]
+}, {
+  "propCd" : "0000000186",
+  "propShrtNm" : "주식회사 미싱이야기",
+  "propFullNm" : "주식회사 미싱이야기",
+  "complexes" : [ {
+    "propCd" : "0000000186",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "메가스테이 창신동",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01056572527",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "메가스테이", "메가스테이 창신동", "메가 스테이" ]
+}, {
+  "propCd" : "0000000064",
+  "propShrtNm" : "에스턴호텔춘천",
+  "propFullNm" : "주식회사 에머슨춘천",
+  "complexes" : [ {
+    "propCd" : "0000000064",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "에스턴호텔춘천",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0332550000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에스턴 호텔", "에스턴 춘천", "어스턴호텔", "에스턴호텔", "이스턴 호텔", "이스턴호텔춘천" ]
+}, {
+  "propCd" : "0000000185",
+  "propShrtNm" : "모멘토 호스텔",
+  "propFullNm" : "모멘토 호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000185",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "모멘토 호스텔 종로",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01057042022",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "모멘토호스텔", "모멘토", "모멘 토 호스텔", "모멘토 종로", "모멘토 호스텔 종로" ]
+}, {
+  "propCd" : "0000000045",
+  "propShrtNm" : "비스타케이호텔월드컵",
+  "propFullNm" : "(주)그리핀나인/비스타케이호텔월드컵",
+  "complexes" : [ {
+    "propCd" : "0000000045",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "비스타케이호텔월드컵",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0648027000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "비스타케이", "비스타 케이", "비스타케이 호텔", "비스타 케이 호텔", "비스타 케이 호텔 월드컵" ]
+}, {
+  "propCd" : "0000000166",
+  "propShrtNm" : "호텔어라운드 속초",
+  "propFullNm" : "호텔어라운드 속초",
+  "complexes" : [ {
+    "propCd" : "0000000166",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔어라운드 속초",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0338008899",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "어라운드 속초", "호텔어라운드", "어라운드속초", "호텔 어라운드 속초", "어라운 속초" ]
+}, {
+  "propCd" : "0000000044",
+  "propShrtNm" : "ORAKAI",
+  "propFullNm" : "ORAKAI",
+  "complexes" : [ {
+    "propCd" : "0000000044",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "ORAKAI CHEONGGYESAN HOTEL",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0262007300",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000044",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "ORAKAI DAEHAKRO HOTEL",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0263537700",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000044",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "ORAKAI INSADONG SUITES",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0262628888",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000044",
+    "cmpxCd" : "00004",
+    "cmpxNm" : "ORAKAI SONGDO PARK HOTEL",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0322107000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "오라카이", "오라 카이", "오라카이 호텔", "오락카이", "오라케이", "오라 케이" ]
+}, {
+  "propCd" : "0000000165",
+  "propShrtNm" : "보타닉호텔",
+  "propFullNm" : "보타닉호텔",
+  "complexes" : [ {
+    "propCd" : "0000000165",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "보타닉호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01036572856",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "보타닉 호텔", "보타 닉 호텔" ]
+}, {
+  "propCd" : "0000000047",
+  "propShrtNm" : "젠하이더웨이(트로피컬하이드어웨이)",
+  "propFullNm" : "젠하이더웨이(트로피컬하이드어웨이)",
+  "complexes" : [ {
+    "propCd" : "0000000047",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "트로피컬하이드어웨이",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647921462",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "젠하이더웨이", "하이드어웨이", "트로피컬 하이드어웨이", "트로피컬하이드어웨이", "하이드 어웨이", "젠 하이더웨이", "트로피컬" ]
+}, {
+  "propCd" : "0000000168",
+  "propShrtNm" : "청수당스테이 북촌",
+  "propFullNm" : "청수당스테이 북촌",
+  "complexes" : [ {
+    "propCd" : "0000000168",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "청수당스테이 북촌",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01097078414",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "청수당", "청수당스테이", "청수 당", "청수당 스테이" ]
+}, {
+  "propCd" : "0000000046",
+  "propShrtNm" : "서울도농상회",
+  "propFullNm" : "서울도농상회",
+  "complexes" : [ {
+    "propCd" : "0000000046",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "도농상회수유리",
+    "cmpxTp" : "F",
+    "cmpxReprTel" : "020000000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "도농상회", "도농 상회", "도농", "도농상회수유리" ]
+}, {
+  "propCd" : "0000000167",
+  "propShrtNm" : "해운대 웨이브",
+  "propFullNm" : "해운대 웨이브",
+  "complexes" : [ {
+    "propCd" : "0000000167",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "해운대 웨이브",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07041242887",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "해운대웨이브", "웨이브 해운대", "웨이브", "해운대 웨이 브" ]
+}, {
+  "propCd" : "0000000049",
+  "propShrtNm" : "오션팰리스호텔",
+  "propFullNm" : "오션팰리스호텔",
+  "complexes" : [ {
+    "propCd" : "0000000049",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "오션팰리스호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647305800",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "오션팰리스", "오션 팰리스 호텔", "오션 팰리스", "오션 팰리 스", "오션팰러스" ]
+}, {
+  "propCd" : "0000000048",
+  "propShrtNm" : "Surestay Plus Asan Hotel",
+  "propFullNm" : "Surestay Plus Hotel by Best Western Asasn",
+  "complexes" : [ {
+    "propCd" : "0000000048",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "Surestay Plus Asan Hotel",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0415483030",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "슈어스테이", "슈어 스테이", "아산 호텔", "베스트웨스턴 아산", "슈어스테이 아산", "슈어 스테이 아산", "Surestay Plus Hotel by Best Western Asasn" ]
+}, {
+  "propCd" : "0000000169",
+  "propShrtNm" : "스테이파이 파주케이힐스",
+  "propFullNm" : "스테이파이 파주케이힐스",
+  "complexes" : [ {
+    "propCd" : "0000000169",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "스테이파이 파주케이힐스",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "15511015",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "스테이파이", "파주케이힐스", "케이힐스", "파주 케이힐스", "스테이 파이", "파주 케이 힐스" ]
+}, {
+  "propCd" : "0000000050",
+  "propShrtNm" : "인트라다호텔 이천",
+  "propFullNm" : "인트라다호텔 이천",
+  "complexes" : [ {
+    "propCd" : "0000000050",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "인트라다호텔 이천",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "16442322",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "인트라다", "인트라다 이천", "인트라다호텔", "인트라 다", "인트라 다 호텔" ]
+}, {
+  "propCd" : "0000000171",
+  "propShrtNm" : "엠83호텔",
+  "propFullNm" : "엠83호텔",
+  "complexes" : [ {
+    "propCd" : "0000000171",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "엠83",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01063628932",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "엠83", "엠 83", "M83", "엠 팔삼", "엠팔삼" ]
+}, {
+  "propCd" : "0000000170",
+  "propShrtNm" : "주식회사 페텔",
+  "propFullNm" : "주식회사 페텔",
+  "complexes" : [ {
+    "propCd" : "0000000170",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "코브스테이 해운대",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0517104663",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000170",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "거창 산림레포츠파크",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0559439026",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "코브스테이", "코브 스테이", "코브해운대", "코브 해운대" ]
+}, {
+  "propCd" : "0000000052",
+  "propShrtNm" : "이호MH호텔",
+  "propFullNm" : "이호MH호텔",
+  "complexes" : [ {
+    "propCd" : "0000000052",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "이호MH호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647436444",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "이호 MH", "이호엠에이치", "MH호텔", "이호 엠에이치", "이호 엠 에이치", "이호엠에이치호텔" ]
+}, {
+  "propCd" : "0000000173",
+  "propShrtNm" : "재단법인 라이나전성기재단",
+  "propFullNm" : "재단법인 라이나전성기재단",
+  "complexes" : [ {
+    "propCd" : "0000000173",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "바랑재",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0333361111",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "바랑재", "라이나 바랑재", "라이나전성기재단" ]
+}, {
+  "propCd" : "0000000051",
+  "propShrtNm" : "애월비치호텔",
+  "propFullNm" : "애월비치호텔",
+  "complexes" : [ {
+    "propCd" : "0000000051",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "애월비치호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647999952",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "애월비치", "애월 비치", "애월 비치 호텔", "에월비치", "에월 비치" ]
+}, {
+  "propCd" : "0000000172",
+  "propShrtNm" : "고성군 유스호스텔",
+  "propFullNm" : "고성군 유스호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000172",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "고성군 유스호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0556721010",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "고성 유스호스텔", "고성유스호스텔", "고성 유스" ]
+}, {
+  "propCd" : "0000000054",
+  "propShrtNm" : "에스앤호텔",
+  "propFullNm" : "에스앤호텔",
+  "complexes" : [ {
+    "propCd" : "0000000054",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "에스앤호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0419345678",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에스앤 호텔", "S&N 호텔", "에스 앤 호텔" ]
+}, {
+  "propCd" : "0000000175",
+  "propShrtNm" : "엔조이 스테이",
+  "propFullNm" : "엔조이 스테이",
+  "complexes" : [ {
+    "propCd" : "0000000175",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "엔조이 스테이",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01099108317",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "엔조이스테이", "엔조이", "엔 조이 스테이" ]
+}, {
+  "propCd" : "0000000053",
+  "propShrtNm" : "굿모닝레지던스휴",
+  "propFullNm" : "굿모닝레지던스휴",
+  "complexes" : [ {
+    "propCd" : "0000000053",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "굿모닝레지던스휴",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0424894000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000174",
+  "propShrtNm" : "화성서해마루 유스호스텔",
+  "propFullNm" : "화성서해마루 유스호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000174",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "화성서해마루 유스호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0313570924",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "화성서해마루유스호스텔", "화성써해마루 유스호스텔" ]
+}, {
+  "propCd" : "0000000078",
+  "propShrtNm" : "동국대학교 만해마을수련원",
+  "propFullNm" : "동국대학교 만해마을수련원",
+  "complexes" : [ {
+    "propCd" : "0000000078",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "만해마을리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0334622303",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "동국대학교만해마을수련원", "만해마을리조트" ]
+}, {
+  "propCd" : "0000000111",
+  "propShrtNm" : "호텔 드립앤드롭",
+  "propFullNm" : "호텔 드립앤드롭",
+  "complexes" : [ {
+    "propCd" : "0000000111",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "(주)로그호텔그룹(호텔드립앤드롭)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "023186005",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "호텔드립앤드롭", "(주)로그호텔그룹(호텔드립앤드롭)" ]
+}, {
+  "propCd" : "0000000077",
+  "propShrtNm" : "호텔아이",
+  "propFullNm" : "호텔아이",
+  "complexes" : [ {
+    "propCd" : "0000000077",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔아이",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0326646624",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000110",
+  "propShrtNm" : "이안레지던스호텔",
+  "propFullNm" : "이안레지던스호텔",
+  "complexes" : [ {
+    "propCd" : "0000000110",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "이안레지던스호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0424873939",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000113",
+  "propShrtNm" : "르꼼떼블루",
+  "propFullNm" : "르꼼떼블루",
+  "complexes" : [ {
+    "propCd" : "0000000113",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "르꼼떼블루",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0333330790",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000079",
+  "propShrtNm" : "뉴천지호텔",
+  "propFullNm" : "뉴천지호텔",
+  "complexes" : [ {
+    "propCd" : "0000000079",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "뉴천지호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0222656131",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000112",
+  "propShrtNm" : "㈜카일프라퍼티 보령지점",
+  "propFullNm" : "발레리조트 보령",
+  "complexes" : [ {
+    "propCd" : "0000000112",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "발레리조트 보령",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0419354500",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "㈜카일프라퍼티보령지점", "카일프라퍼티 보령지점", "발레리조트 보령" ]
+}, {
+  "propCd" : "0000000115",
+  "propShrtNm" : "오레브리조트",
+  "propFullNm" : "오레브리조트",
+  "complexes" : [ {
+    "propCd" : "0000000115",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "오레브리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647381988",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000114",
+  "propShrtNm" : "웨이스톤서우봉호텔",
+  "propFullNm" : "웨이스톤서우봉호텔",
+  "complexes" : [ {
+    "propCd" : "0000000114",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "웨이스톤서우봉호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647849337",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "웨이스톤써우봉호텔" ]
+}, {
+  "propCd" : "0000000117",
+  "propShrtNm" : "국립강릉원주대학교",
+  "propFullNm" : "국립강릉원주대학교",
+  "complexes" : [ {
+    "propCd" : "0000000117",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "국립강릉원주대학교",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336427001",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000116",
+  "propShrtNm" : "서우봉비치호텔",
+  "propFullNm" : "서우봉비치호텔",
+  "complexes" : [ {
+    "propCd" : "0000000116",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "서우봉비치호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647315000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "써우봉비치호텔" ]
+}, {
+  "propCd" : "0000000119",
+  "propShrtNm" : "세안에이앤에이",
+  "propFullNm" : "세안에이앤에이",
+  "complexes" : [ {
+    "propCd" : "0000000119",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "바비엥2",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0263990033",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000119",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "트윈시티남산",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0263990033",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "쎄안에이앤에이" ]
+}, {
+  "propCd" : "0000000118",
+  "propShrtNm" : "에이치에이개발 주식회사",
+  "propFullNm" : "에이치에이개발 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000118",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "(주)에이치에이개발(더하운드반달섬2)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0314995558",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에이치에이개발주식회사", "(주)에이치에이개발(더하운드반달섬2)" ]
+}, {
+  "propCd" : "0000000081",
+  "propShrtNm" : "베니키아호텔 서산",
+  "propFullNm" : "베니키아호텔 서산",
+  "complexes" : [ {
+    "propCd" : "0000000081",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "베니키아호텔 서산",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0416613500",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "베니키아호텔 써산", "베니키아호텔서산" ]
+}, {
+  "propCd" : "0000000080",
+  "propShrtNm" : "호텔더본제주",
+  "propFullNm" : "호텔더본제주",
+  "complexes" : [ {
+    "propCd" : "0000000080",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔더본제주",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647668988",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000083",
+  "propShrtNm" : "설악산유스호스텔",
+  "propFullNm" : "설악산유스호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000083",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "설악산유스호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336367115",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000082",
+  "propShrtNm" : "수원코리아호텔",
+  "propFullNm" : "수원코리아호텔",
+  "complexes" : [ {
+    "propCd" : "0000000082",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "수원코리아호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0312215678",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000085",
+  "propShrtNm" : "주식회사 스타블",
+  "propFullNm" : "주식회사 스타블",
+  "complexes" : [ {
+    "propCd" : "0000000085",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔701 경주",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0546200701",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "스타블", "주식회사스타블", "호텔701 경주" ]
+}, {
+  "propCd" : "0000000084",
+  "propShrtNm" : "올집 아카이브 4H ",
+  "propFullNm" : "올집 아카이브 4H 레지던스호텔",
+  "complexes" : [ {
+    "propCd" : "0000000084",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "올집 아카이브 4H ",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01021269909",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "올집아카이브4H", "올집 아카이브 4H 레지던스호텔", "올집 아카이브 4H" ]
+}, {
+  "propCd" : "0000000087",
+  "propShrtNm" : "유메모리 리조트",
+  "propFullNm" : "유메모리 리조트",
+  "complexes" : [ {
+    "propCd" : "0000000087",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "유메모리 리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0338230918",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000087",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "유메모리 캠핑",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0338230918",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "유메모리리조트" ]
+}, {
+  "propCd" : "0000000120",
+  "propShrtNm" : "힐스테이트 송도스테이에디션",
+  "propFullNm" : "힐스테이트 송도스테이에디션",
+  "complexes" : [ {
+    "propCd" : "0000000120",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "힐스테이트 송도스테이에디션",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0328588380",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "힐스태이트 송도스태이에디션", "힐스테이트송도스테이에디션" ]
+}, {
+  "propCd" : "0000000086",
+  "propShrtNm" : "리앤이이스턴제주",
+  "propFullNm" : "리앤이이스턴제주",
+  "complexes" : [ {
+    "propCd" : "0000000086",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "리앤이이스턴제주",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647354100",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000067",
+  "propShrtNm" : "에머슨에이엠씨 주식회사",
+  "propFullNm" : "에머슨에이엠씨 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000067",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "E7 양양죽도",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "16002350",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에머슨에이엠시 주식회사", "에머슨에이엠씨주식회사", "E7 양양죽도" ]
+}, {
+  "propCd" : "0000000100",
+  "propShrtNm" : "리인스테이호텔",
+  "propFullNm" : "리인스테이호텔",
+  "complexes" : [ {
+    "propCd" : "0000000100",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "리인스테이호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0556826200",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "리인스태이호텔" ]
+}, {
+  "propCd" : "0000000188",
+  "propShrtNm" : "(주)부산관광호텔",
+  "propFullNm" : "(주)부산관광호텔",
+  "complexes" : [ {
+    "propCd" : "0000000188",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "부산관광호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0512414301",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "부산관광호텔" ]
+}, {
+  "propCd" : "0000000066",
+  "propShrtNm" : "(주)스위트메이서귀포호텔",
+  "propFullNm" : "스위트메이서귀포호텔",
+  "complexes" : [ {
+    "propCd" : "0000000066",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "스위트메이서귀포호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647395757",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "(주)스위트메이써귀포호텔", "스위트메이서귀포호텔" ]
+}, {
+  "propCd" : "0000000187",
+  "propShrtNm" : "한서대학교 산학협력단",
+  "propFullNm" : "한서대학교 산학협력단",
+  "complexes" : [ {
+    "propCd" : "0000000187",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "한서대학교",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0416601144",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "한서대학교산학협력단", "한써대학교 산학협력단", "한서대학교" ]
+}, {
+  "propCd" : "0000000069",
+  "propShrtNm" : "강원도립대학교",
+  "propFullNm" : "강원도립대학교",
+  "complexes" : [ {
+    "propCd" : "0000000069",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "강원도립대학교",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336608015",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000102",
+  "propShrtNm" : "구례지리산리조트",
+  "propFullNm" : "구례지리산리조트",
+  "complexes" : [ {
+    "propCd" : "0000000102",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "구례지리산리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0617810100",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000068",
+  "propShrtNm" : "주식회사 에이치제이에스컴퍼니",
+  "propFullNm" : "헤르멘하우스",
+  "complexes" : [ {
+    "propCd" : "0000000068",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "헤르멘하우스",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647921213",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에이치제이에스컴퍼니", "주식회사에이치제이에스컴퍼니", "헤르멘하우스" ]
+}, {
+  "propCd" : "0000000101",
+  "propShrtNm" : "사이판라오라오",
+  "propFullNm" : "사이판라오라오",
+  "complexes" : [ {
+    "propCd" : "0000000101",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "사이판라오라오",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0234109599",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000189",
+  "propShrtNm" : "디하우스 호스텔",
+  "propFullNm" : "디하우스 호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000189",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "디하우스 호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01099102864",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "디하우스호스텔" ]
+}, {
+  "propCd" : "0000000104",
+  "propShrtNm" : "(주)한류",
+  "propFullNm" : "(주)한류",
+  "complexes" : [ {
+    "propCd" : "0000000104",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "뉴코리아리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647997001",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "한류", "뉴코리아리조트" ]
+}, {
+  "propCd" : "0000000103",
+  "propShrtNm" : "아르반호텔",
+  "propFullNm" : "아르반호텔",
+  "complexes" : [ {
+    "propCd" : "0000000103",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "아르반호텔 부산",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0518059901",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000103",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "아르반시티호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0518519949",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000106",
+  "propShrtNm" : "주식회사 사람",
+  "propFullNm" : "오렌지카운티 병점역",
+  "complexes" : [ {
+    "propCd" : "0000000106",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "오렌지카운티병점역",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0312670991",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "사람", "주식회사사람", "오렌지카운티 병점역", "오렌지카운티병점역" ]
+}, {
+  "propCd" : "0000000105",
+  "propShrtNm" : "레이크힐스호텔 속리산",
+  "propFullNm" : "레이크힐스호텔 속리산",
+  "complexes" : [ {
+    "propCd" : "0000000105",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "레이크힐스호텔 속리산",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0435425281",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "레이크힐스호텔속리산" ]
+}, {
+  "propCd" : "0000000108",
+  "propShrtNm" : "주식회사 이든프롭스",
+  "propFullNm" : "주식회사 이든프롭스",
+  "complexes" : [ {
+    "propCd" : "0000000108",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "스카이썬이천호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0316344440",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "이든프롭스", "주식회사이든프롭스", "스카이썬이천호텔" ]
+}, {
+  "propCd" : "0000000107",
+  "propShrtNm" : "㈜에스티산업개발",
+  "propFullNm" : "부티크나인 호텔 동대문 ",
+  "complexes" : [ {
+    "propCd" : "0000000107",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "부티크나인 호텔 동대문 ",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "029250720",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에스티산업개발", "부티크나인 호텔 동대문" ]
+}, {
+  "propCd" : "0000000109",
+  "propShrtNm" : "에잇레스트 호텔",
+  "propFullNm" : "에잇레스트 호텔",
+  "complexes" : [ {
+    "propCd" : "0000000109",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "에잇 레스트 호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07048700009",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000109",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "쉼표힐링존",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07048700009",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에잇레스트호텔" ]
+}, {
+  "propCd" : "0000000070",
+  "propShrtNm" : "주식회사 케이트리",
+  "propFullNm" : "주식회사 케이트리",
+  "complexes" : [ {
+    "propCd" : "0000000070",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "케이트리호텔 평택",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0316154881",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "주식회사케이트리", "케이트리", "케이트리호텔 평택" ]
+}, {
+  "propCd" : "0000000191",
+  "propShrtNm" : "주식회사 그리핀나인",
+  "propFullNm" : "주식회사 그리핀나인",
+  "complexes" : [ {
+    "propCd" : "0000000191",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "비스타케이호텔월드컵",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0648027000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "그리핀나인", "주식회사그리핀나인", "비스타케이호텔월드컵" ]
+}, {
+  "propCd" : "0000000190",
+  "propShrtNm" : "에머슨스위트낙산 주식회사",
+  "propFullNm" : "에머슨스위트낙산 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000190",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "플럼바고양양오션앤올스위트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "15772364",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에머슨스위트낙산주식회사", "플럼바고양양오션앤올스위트" ]
+}, {
+  "propCd" : "0000000072",
+  "propShrtNm" : "(주)아도니스",
+  "propFullNm" : "(주)아도니스",
+  "complexes" : [ {
+    "propCd" : "0000000072",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "아도니스 아트힐 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0315309300",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "아도니스", "아도니스 아트힐 호텔" ]
+}, {
+  "propCd" : "0000000193",
+  "propShrtNm" : "동대문 뉴 호스텔",
+  "propFullNm" : "동대문 뉴 호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000193",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "동대문 뉴 호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01055742567",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "동대문뉴호스텔" ]
+}, {
+  "propCd" : "0000000071",
+  "propShrtNm" : "솔라고호텔 주식회사",
+  "propFullNm" : "솔라고호텔 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000071",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "SOLLAGO HOTEL & RESIDENCE",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0222637979",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "솔라고호텔주식회사", "SOLLAGO HOTEL & RESIDENCE" ]
+}, {
+  "propCd" : "0000000192",
+  "propShrtNm" : "간소스테이",
+  "propFullNm" : "간소스테이",
+  "complexes" : [ {
+    "propCd" : "0000000192",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "간소스테이",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01082118414",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "간소스태이" ]
+}, {
+  "propCd" : "0000000074",
+  "propShrtNm" : "(주)마리나베이 코리아",
+  "propFullNm" : "(주)마리나베이 코리아",
+  "complexes" : [ {
+    "propCd" : "0000000074",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔마리나베이 코리아",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "18338050",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "(주)마리나베이코리아", "마리나베이 코리아", "호텔마리나베이 코리아" ]
+}, {
+  "propCd" : "0000000073",
+  "propShrtNm" : "(주)블루오션 자산관리",
+  "propFullNm" : "(주)블루오션 자산관리",
+  "complexes" : [ {
+    "propCd" : "0000000073",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "블루오션 호텔1차",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0322675004",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000073",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "2차 블루오션 레지던스호텔 ",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0322675004",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000073",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "블루오션 호텔3차",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0322675004",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000073",
+    "cmpxCd" : "00004",
+    "cmpxNm" : "블루오션 호텔4차",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0322675004",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "(주)블루오션자산관리", "블루오션 자산관리" ]
+}, {
+  "propCd" : "0000000076",
+  "propShrtNm" : "경성호텔",
+  "propFullNm" : "경성호텔",
+  "complexes" : [ {
+    "propCd" : "0000000076",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "경성호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0518020090",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000075",
+  "propShrtNm" : "(주)성도디앤씨 부안지점",
+  "propFullNm" : "(주)성도디앤씨 부안지점",
+  "complexes" : [ {
+    "propCd" : "0000000075",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "캘리포니아호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0635812694",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000075",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "블랙하우스모텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0635812694",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "(주)성도디앤시 부안지점", "(주)성도디앤씨부안지점", "성도디앤씨 부안지점" ]
+}, {
+  "propCd" : "0000000012",
+  "propShrtNm" : "천지연 힐 스테이",
+  "propFullNm" : "천지연 힐 스테이호텔",
+  "complexes" : [ {
+    "propCd" : "0000000012",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "천지연 힐 스테이",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "06480515",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "천지연 힐 스태이", "천지연힐스테이", "천지연 힐 스테이호텔" ]
+}, {
+  "propCd" : "0000000133",
+  "propShrtNm" : "주식회사 삼정",
+  "propFullNm" : "주식회사 삼정",
+  "complexes" : [ {
+    "propCd" : "0000000133",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "유니아일랜드 더 스파빌",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0329339304",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "삼정", "주식회사삼정", "유니아일랜드 더 스파빌" ]
+}, {
+  "propCd" : "0000000011",
+  "propShrtNm" : "윈스카이",
+  "propFullNm" : "주식회사 선우디벨로프먼트",
+  "complexes" : [ {
+    "propCd" : "0000000011",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "윈스카이호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647237237",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "윈스카이호텔" ]
+}, {
+  "propCd" : "0000000099",
+  "propShrtNm" : "가톨릭관동대학교",
+  "propFullNm" : "가톨릭관동대학교",
+  "complexes" : [ {
+    "propCd" : "0000000099",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "가톨릭관동대학교",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336497114",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000132",
+  "propShrtNm" : "에잇 레스트 종로",
+  "propFullNm" : "에잇 레스트 종로",
+  "complexes" : [ {
+    "propCd" : "0000000132",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "에잇 레스트 종로",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07043371210",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에잇레스트종로" ]
+}, {
+  "propCd" : "0000000014",
+  "propShrtNm" : "라마다바이윈덤제주더함덕호텔",
+  "propFullNm" : "라마다바이윈덤제주더함덕호텔",
+  "complexes" : [ {
+    "propCd" : "0000000014",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "라마다바이윈덤제주더함덕호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647935500",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000135",
+  "propShrtNm" : "주식회사 에스턴개발",
+  "propFullNm" : "주식회사 에스턴개발",
+  "complexes" : [ {
+    "propCd" : "0000000135",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "에스턴호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0332440002",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에스턴개발", "주식회사에스턴개발", "에스턴호텔" ]
+}, {
+  "propCd" : "0000000013",
+  "propShrtNm" : "조이호텔",
+  "propFullNm" : "(주)윈월드 / 조이호텔",
+  "complexes" : [ {
+    "propCd" : "0000000013",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "조이호텔(구.알앤티호텔)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647211414",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000013",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "제주캐슬풀리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647211414",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000013",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "제주스카이관광호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647211414",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000134",
+  "propShrtNm" : "스테이네오",
+  "propFullNm" : "스테이네오",
+  "complexes" : [ {
+    "propCd" : "0000000134",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "(주)스테이네오(더웨스턴부산)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0517111090",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000134",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "(주)스테이네오(뉴블랑센트럴명동)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "15337220",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "스태이네오" ]
+}, {
+  "propCd" : "0000000016",
+  "propShrtNm" : "아이미제주비치(제주비치W)",
+  "propFullNm" : "아이미제주비치(제주비치W)",
+  "complexes" : [ {
+    "propCd" : "0000000016",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "아이미제주비치(제주비치W)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647800000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000137",
+  "propShrtNm" : "스테이네오",
+  "propFullNm" : "스테이네오",
+  "complexes" : [ {
+    "propCd" : "0000000137",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "뉴블랑 센트럴 명동",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0200000000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "스태이네오", "뉴블랑 센트럴 명동" ]
+}, {
+  "propCd" : "0000000015",
+  "propShrtNm" : "노블레스메르디앙호텔",
+  "propFullNm" : "노블레스메르디앙호텔",
+  "complexes" : [ {
+    "propCd" : "0000000015",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "노블레스메르디앙호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0222489100",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000136",
+  "propShrtNm" : "한성개발주식회사",
+  "propFullNm" : "한성개발주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000136",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "그라벨호텔제주",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647408000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "그라벨호텔제주" ]
+}, {
+  "propCd" : "0000000018",
+  "propShrtNm" : "디아일랜드블루호텔",
+  "propFullNm" : "디아일랜드블루호텔",
+  "complexes" : [ {
+    "propCd" : "0000000018",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "디아일랜드블루호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647626532",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000139",
+  "propShrtNm" : "라메르호텔",
+  "propFullNm" : "라메르호텔",
+  "complexes" : [ {
+    "propCd" : "0000000139",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "라메르관광호텔부산해수랜드(주)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0516343001",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "라메르관광호텔부산해수랜드(주)" ]
+}, {
+  "propCd" : "0000000017",
+  "propShrtNm" : "(주)인덕물산",
+  "propFullNm" : "인덕원 센트럴 관광호텔",
+  "complexes" : [ {
+    "propCd" : "0000000017",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "센트럴 관광호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0314232111",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "인덕물산", "인덕원 센트럴 관광호텔", "센트럴 관광호텔" ]
+}, {
+  "propCd" : "0000000138",
+  "propShrtNm" : "페트리커 주식회사",
+  "propFullNm" : "페트리커 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000138",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "어반서티호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0332560002",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "페트리커주식회사", "어반서티호텔" ]
+}, {
+  "propCd" : "0000000019",
+  "propShrtNm" : "아비아 호텔 서귀포",
+  "propFullNm" : "아비아 호텔 서귀포",
+  "complexes" : [ {
+    "propCd" : "0000000019",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "아비아 호텔 서귀포",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "15226110",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "아비아 호텔 써귀포", "아비아호텔서귀포" ]
+}, {
+  "propCd" : "0000000140",
+  "propShrtNm" : "블루닷포쉬텔",
+  "propFullNm" : "블루닷포쉬텔",
+  "complexes" : [ {
+    "propCd" : "0000000140",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "블루닷포쉬텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "027750424",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000021",
+  "propShrtNm" : "주)밸류호텔 월드와이드부산",
+  "propFullNm" : "주)밸류호텔 월드와이드부산",
+  "complexes" : [ {
+    "propCd" : "0000000021",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "밸류호텔 부산",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0519605500",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "주)밸류호텔월드와이드부산", "밸류호텔 부산" ]
+}, {
+  "propCd" : "0000000142",
+  "propShrtNm" : "지엔비호텔",
+  "propFullNm" : "지엔비호텔",
+  "complexes" : [ {
+    "propCd" : "0000000142",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "지엔비호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0512435555",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000020",
+  "propShrtNm" : "라마다태백호텔",
+  "propFullNm" : "라마다태백호텔",
+  "complexes" : [ {
+    "propCd" : "0000000020",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "라마다태백호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "18991301",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000141",
+  "propShrtNm" : "주식회사 영종팰리스",
+  "propFullNm" : "주식회사 영종팰리스",
+  "complexes" : [ {
+    "propCd" : "0000000141",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "영종팰리스",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0327519155",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "영종팰리스", "주식회사영종팰리스" ]
+}, {
+  "propCd" : "0000000001",
+  "propShrtNm" : "다올호텔",
+  "propFullNm" : "다올호텔",
+  "complexes" : [ {
+    "propCd" : "0000000001",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "주식회사 다올비젼",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000001",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "다올호텔(제주)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000001",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "[교육용]호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000001",
+    "cmpxCd" : "00005",
+    "cmpxNm" : "[교육용]골프",
+    "cmpxTp" : "G",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000001",
+    "cmpxCd" : "00006",
+    "cmpxNm" : "다올골프[테스트용]",
+    "cmpxTp" : "G",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000089",
+  "propShrtNm" : "라 파미에_양양",
+  "propFullNm" : "라 파미에 양양",
+  "complexes" : [ {
+    "propCd" : "0000000089",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "라 파미에 양양",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336720505",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "라파미에_양양", "라 파미에 양양" ]
+}, {
+  "propCd" : "0000000122",
+  "propShrtNm" : "㈜제이디앤드디",
+  "propFullNm" : "㈜제이디앤드디",
+  "complexes" : [ {
+    "propCd" : "0000000122",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "르몽호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0222674190",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "제이디앤드디", "르몽호텔" ]
+}, {
+  "propCd" : "0000000088",
+  "propShrtNm" : "더 베스트 제주 성산 호텔",
+  "propFullNm" : "더 베스트 제주 성산 호텔",
+  "complexes" : [ {
+    "propCd" : "0000000088",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "더 베스트 제주 성산 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647840550",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "더베스트제주성산호텔" ]
+}, {
+  "propCd" : "0000000121",
+  "propShrtNm" : "금강산콘도",
+  "propFullNm" : "금강산콘도",
+  "complexes" : [ {
+    "propCd" : "0000000121",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "금강산콘도(고성)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "025110203",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000121",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "금강산콘도(제주)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "025110203",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000124",
+  "propShrtNm" : "애터미 주식회사",
+  "propFullNm" : "애터미 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000124",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "속리산 포레스트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0435407700",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "애터미주식회사", "속리산 포레스트" ]
+}, {
+  "propCd" : "0000000002",
+  "propShrtNm" : "연습용호텔",
+  "propFullNm" : "연습용호텔",
+  "complexes" : [ {
+    "propCd" : "0000000002",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "연습용호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000002",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "연습용골프",
+    "cmpxTp" : "G",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000002",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "영업부(Banquet)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000123",
+  "propShrtNm" : "K Stay 게스트 하우스 동대문",
+  "propFullNm" : "K Stay 게스트 하우스 동대문",
+  "complexes" : [ {
+    "propCd" : "0000000123",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "K Stay 게스트 하우스 동대문",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01063461421",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "KStay게스트하우스동대문" ]
+}, {
+  "propCd" : "0000000126",
+  "propShrtNm" : "㈜동해보양온천컨벤션호텔",
+  "propFullNm" : "㈜동해보양온천컨벤션호텔",
+  "complexes" : [ {
+    "propCd" : "0000000126",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "㈜동해보양온천컨벤션호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0335300700",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "동해보양온천컨벤션호텔" ]
+}, {
+  "propCd" : "0000000125",
+  "propShrtNm" : "주식회사오롯",
+  "propFullNm" : "주식회사오롯",
+  "complexes" : [ {
+    "propCd" : "0000000125",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "르부르낙산 바이 오롯",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0516217702",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "르부르낙산 바이 오롯" ]
+}, {
+  "propCd" : "0000000128",
+  "propShrtNm" : "SUNSETHOTEL",
+  "propFullNm" : "SUNSETHOTEL",
+  "complexes" : [ {
+    "propCd" : "0000000128",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "선셋호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0517309900",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "선셋호텔" ]
+}, {
+  "propCd" : "0000000127",
+  "propShrtNm" : "태백호텔㈜동해보양온천컨벤션호텔",
+  "propFullNm" : "태백호텔㈜동해보양온천컨벤션호텔",
+  "complexes" : [ {
+    "propCd" : "0000000127",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "태백호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0335505800",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "태백호텔" ]
+}, {
+  "propCd" : "0000000129",
+  "propShrtNm" : "오로시에 관광호텔",
+  "propFullNm" : "오로시에 관광호텔",
+  "complexes" : [ {
+    "propCd" : "0000000129",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "오로시에 관광호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0222025002",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "오로시에관광호텔", "오로씨에 관광호텔" ]
+}, {
+  "propCd" : "0000000090",
+  "propShrtNm" : "갤러리인스테이호텔",
+  "propFullNm" : "갤러리인스테이호텔",
+  "complexes" : [ {
+    "propCd" : "0000000090",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "갤러리 인 스테이 속초",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336322772",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "갤러리인스태이호텔", "갤러리 인 스테이 속초" ]
+}, {
+  "propCd" : "0000000092",
+  "propShrtNm" : "솔라뷰 정동진",
+  "propFullNm" : "솔라뷰 정동진",
+  "complexes" : [ {
+    "propCd" : "0000000092",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "솔라뷰 정동진",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0330000000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "솔라뷰정동진" ]
+}, {
+  "propCd" : "0000000091",
+  "propShrtNm" : "홈즈스테이",
+  "propFullNm" : "홈즈스테이",
+  "complexes" : [ {
+    "propCd" : "0000000091",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "홈즈스테이 수원",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0312330338",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000091",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "홈즈스테이 지밸리 가산",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "028680338",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000091",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "홈즈레드 명동",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220390884",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "홈즈스태이" ]
+}, {
+  "propCd" : "0000000094",
+  "propShrtNm" : "에버미라클호텔 밀양",
+  "propFullNm" : "에버미라클호텔 밀양",
+  "complexes" : [ {
+    "propCd" : "0000000094",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "에버미라클호텔 밀양",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0553510100",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에버미라클호텔밀양" ]
+}, {
+  "propCd" : "0000000093",
+  "propShrtNm" : "oceanstay yangyang",
+  "propFullNm" : "oceanstay yangyang",
+  "complexes" : [ {
+    "propCd" : "0000000093",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "oceanstay yangyang",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "16002350",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "oceanstayyangyang" ]
+}, {
+  "propCd" : "0000000096",
+  "propShrtNm" : "비에스티호텔스 주식회사",
+  "propFullNm" : "비에스티호텔스 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000096",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "한강골드호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "025402260",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "비에스티호텔스주식회사", "한강골드호텔" ]
+}, {
+  "propCd" : "0000000095",
+  "propShrtNm" : "그레이스 스위트 호텔",
+  "propFullNm" : "그레이스 스위트 호텔",
+  "complexes" : [ {
+    "propCd" : "0000000095",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "그레이스 스위트 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0325702600",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "그레이스스위트호텔" ]
+}, {
+  "propCd" : "0000000010",
+  "propShrtNm" : "(주)다올비젼",
+  "propFullNm" : "(주)다올비젼",
+  "complexes" : [ {
+    "propCd" : "0000000010",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "(주)다올비젼",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220388799",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "다올비젼" ]
+}, {
+  "propCd" : "0000000098",
+  "propShrtNm" : "주식회사 센트럴호텔레지던스",
+  "propFullNm" : "주식회사 센트럴호텔레지던스",
+  "complexes" : [ {
+    "propCd" : "0000000098",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "센트럴광주호텔&레지던스",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0623718700",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "센트럴호텔레지던스", "주식회사센트럴호텔레지던스", "센트럴광주호텔&레지던스" ]
+}, {
+  "propCd" : "0000000131",
+  "propShrtNm" : "춘천루체호텔",
+  "propFullNm" : "춘천루체호텔",
+  "complexes" : [ {
+    "propCd" : "0000000131",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "춘천루체호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0332533300",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000097",
+  "propShrtNm" : "유한회사 더사이트",
+  "propFullNm" : "유한회사 더사이트",
+  "complexes" : [ {
+    "propCd" : "0000000097",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "일기일회",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336721718",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "유한회사더사이트", "일기일회" ]
+}, {
+  "propCd" : "0000000130",
+  "propShrtNm" : "파나크 오퍼레이티드 바이 소노",
+  "propFullNm" : "파나크 오퍼레이티드 바이 소노",
+  "complexes" : [ {
+    "propCd" : "0000000130",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "파나크 오퍼레이티드 바이 소노",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "15884888",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "파나크오퍼레이티드바이소노" ]
+}, {
+  "propCd" : "0000000034",
+  "propShrtNm" : "더스타호텔 영광",
+  "propFullNm" : "(주)지디홀딩스 / 더스타호텔 영광",
+  "complexes" : [ {
+    "propCd" : "0000000034",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "더스타호텔 영광",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0613507900",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "더스타호텔영광" ]
+}, {
+  "propCd" : "0000000155",
+  "propShrtNm" : "라비타 호텔",
+  "propFullNm" : "라비타 호텔",
+  "complexes" : [ {
+    "propCd" : "0000000155",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "라비타 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "025450015",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "라비타호텔" ]
+}, {
+  "propCd" : "0000000033",
+  "propShrtNm" : "호텔아벤트리여의도",
+  "propFullNm" : "호텔아벤트리여의도",
+  "complexes" : [ {
+    "propCd" : "0000000033",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔아벤트리여의도",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0226788808",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000154",
+  "propShrtNm" : "호텔유수림",
+  "propFullNm" : "호텔유수림",
+  "complexes" : [ {
+    "propCd" : "0000000154",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔유수림",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0552720033",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000036",
+  "propShrtNm" : "더이스턴 주식회사",
+  "propFullNm" : "더이스턴 주식회사",
+  "complexes" : [ {
+    "propCd" : "0000000036",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "이스턴호텔제주",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647354100",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "더이스턴주식회사", "이스턴호텔제주" ]
+}, {
+  "propCd" : "0000000157",
+  "propShrtNm" : "(주)에이지엠티",
+  "propFullNm" : "(주)에이지엠티",
+  "complexes" : [ {
+    "propCd" : "0000000157",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "을지로어라이브틈",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07086854650",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에이지엠티", "을지로어라이브틈" ]
+}, {
+  "propCd" : "0000000035",
+  "propShrtNm" : "세안에이앤에이(주)제주센트럴지점",
+  "propFullNm" : "센트럴시티 호텔 제주",
+  "complexes" : [ {
+    "propCd" : "0000000035",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "센트럴 시티 제주",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0234139387",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "쎄안에이앤에이(주)제주센트럴지점", "센트럴시티 호텔 제주", "센트럴 시티 제주" ]
+}, {
+  "propCd" : "0000000156",
+  "propShrtNm" : "공유인 유한회사",
+  "propFullNm" : "공유인 유한회사",
+  "complexes" : [ {
+    "propCd" : "0000000156",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "Hotel Ingrid",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0634504500",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "공유인유한회사", "Hotel Ingrid" ]
+}, {
+  "propCd" : "0000000038",
+  "propShrtNm" : "루미아호텔앤리조트",
+  "propFullNm" : "루미아호텔앤리조트",
+  "complexes" : [ {
+    "propCd" : "0000000038",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "루미아호텔앤리조트",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0615541000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000159",
+  "propShrtNm" : "노떼라미아호텔",
+  "propFullNm" : "노떼라미아호텔",
+  "complexes" : [ {
+    "propCd" : "0000000159",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "노떼라미아호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0514627700",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000037",
+  "propShrtNm" : "호텔은파팰리스",
+  "propFullNm" : "호텔은파팰리스",
+  "complexes" : [ {
+    "propCd" : "0000000037",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔은파팰리스",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0634677000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000158",
+  "propShrtNm" : "서울프린스호텔",
+  "propFullNm" : "서울프린스호텔",
+  "complexes" : [ {
+    "propCd" : "0000000158",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "서울프린스호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "027527111",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "써울프린스호텔" ]
+}, {
+  "propCd" : "0000000039",
+  "propShrtNm" : "라마다전주호텔",
+  "propFullNm" : "주식회사 지세인",
+  "complexes" : [ {
+    "propCd" : "0000000039",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "라마다전주호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0637119000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000160",
+  "propShrtNm" : "IBC호텔",
+  "propFullNm" : "IBC호텔",
+  "complexes" : [ {
+    "propCd" : "0000000160",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "경동흥업(주)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0222503000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "경동흥업(주)" ]
+}, {
+  "propCd" : "0000000041",
+  "propShrtNm" : "주식회사 세안피엠씨강정",
+  "propFullNm" : "주식회사 세안피엠씨강정",
+  "complexes" : [ {
+    "propCd" : "0000000041",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "제주 그레이스 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647387777",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "세안피엠씨강정", "주식회사 세안피엠시강정", "주식회사 쎄안피엠씨강정", "주식회사세안피엠씨강정", "제주 그레이스 호텔" ]
+}, {
+  "propCd" : "0000000162",
+  "propShrtNm" : "호텔 세느",
+  "propFullNm" : "호텔 세느",
+  "complexes" : [ {
+    "propCd" : "0000000162",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "호텔 세느",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0220520551",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "호텔 쎄느", "호텔세느" ]
+}, {
+  "propCd" : "0000000040",
+  "propShrtNm" : "주식회사 정상북한산리조트",
+  "propFullNm" : "주식회사 정상북한산리조트",
+  "complexes" : [ {
+    "propCd" : "0000000040",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "ANTO RESORT",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0234085000",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000040",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "ANTO MEMBERS",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "025535555",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "정상북한산리조트", "주식회사 정쌍북한산리조트", "주식회사정상북한산리조트" ]
+}, {
+  "propCd" : "0000000161",
+  "propShrtNm" : "하프레스트 호스텔",
+  "propFullNm" : "하프레스트 호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000161",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "하프레스트 호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "07040995111",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "하프레스트호스텔" ]
+}, {
+  "propCd" : "0000000043",
+  "propShrtNm" : "주식회사 리치팜",
+  "propFullNm" : "리치스테이 호텔 고덕",
+  "complexes" : [ {
+    "propCd" : "0000000043",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "리치 스테이호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0316808000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "리치팜", "주식회사리치팜", "리치스테이 호텔 고덕", "리치 스테이호텔" ]
+}, {
+  "propCd" : "0000000164",
+  "propShrtNm" : "발리376",
+  "propFullNm" : "발리376",
+  "complexes" : [ {
+    "propCd" : "0000000164",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "발리376",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0332632302",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000042",
+  "propShrtNm" : "(주)그리핀베이",
+  "propFullNm" : "(주)그리핀베이",
+  "complexes" : [ {
+    "propCd" : "0000000042",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "(주)그리핀베이",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0512317100",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "그리핀베이" ]
+}, {
+  "propCd" : "0000000163",
+  "propShrtNm" : "코오롱글로벌(주) 코오롱호텔",
+  "propFullNm" : "코오롱글로벌(주) 코오롱호텔",
+  "complexes" : [ {
+    "propCd" : "0000000163",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "금강송에코리움",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0236776677",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000163",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "경주 코오롱 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0547469001",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "코오롱글로벌(주)코오롱호텔" ]
+}, {
+  "propCd" : "0000000023",
+  "propShrtNm" : "세안에이앤에이(주)제주블루지점",
+  "propFullNm" : "The Island Blue Hotel",
+  "complexes" : [ {
+    "propCd" : "0000000023",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "The Island Blue Hotel",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647626532",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "쎄안에이앤에이(주)제주블루지점", "The Island Blue Hotel" ]
+}, {
+  "propCd" : "0000000144",
+  "propShrtNm" : "㈜가야호텔",
+  "propFullNm" : "㈜가야호텔",
+  "complexes" : [ {
+    "propCd" : "0000000144",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "가야호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0549313500",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "가야호텔" ]
+}, {
+  "propCd" : "0000000022",
+  "propShrtNm" : "HOTEL EVERRICH",
+  "propFullNm" : "(주)엘엠크리에이터",
+  "complexes" : [ {
+    "propCd" : "0000000022",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "에버리치호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0329341688",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "HOTELEVERRICH", "에버리치호텔" ]
+}, {
+  "propCd" : "0000000143",
+  "propShrtNm" : "토모인터내셔널㈜",
+  "propFullNm" : "토모인터내셔널㈜",
+  "complexes" : [ {
+    "propCd" : "0000000143",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "웨스턴그레이스토모",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0327515608",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "웨스턴그레이스토모" ]
+}, {
+  "propCd" : "0000000025",
+  "propShrtNm" : "하이캐슬",
+  "propFullNm" : "하이캐슬",
+  "complexes" : [ {
+    "propCd" : "0000000025",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "하이캐슬",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0335607701",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000146",
+  "propShrtNm" : "한스테이",
+  "propFullNm" : "한스테이",
+  "complexes" : [ {
+    "propCd" : "0000000146",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "한스테이",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01031099611",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "한스태이" ]
+}, {
+  "propCd" : "0000000024",
+  "propShrtNm" : "The Jackson9s Hotel ",
+  "propFullNm" : "The Jackson9s Hotel ",
+  "complexes" : [ {
+    "propCd" : "0000000024",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "The Jackson9s Hotel ",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0332530000",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000024",
+    "cmpxCd" : "00002",
+    "cmpxNm" : "잭슨나인스호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0332511000",
+    "mobileNos" : [ ]
+  }, {
+    "propCd" : "0000000024",
+    "cmpxCd" : "00003",
+    "cmpxNm" : "잭슨나인스 리테일",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0338150000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "TheJackson9sHotel", "The Jackson9s Hotel" ]
+}, {
+  "propCd" : "0000000145",
+  "propShrtNm" : "엘 호스텔",
+  "propFullNm" : "엘 호스텔",
+  "complexes" : [ {
+    "propCd" : "0000000145",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "엘 호스텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01083534929",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "엘호스텔" ]
+}, {
+  "propCd" : "0000000027",
+  "propShrtNm" : "타마라 제주 호텔",
+  "propFullNm" : "주식회사 우정이앤씨 타마라호텔",
+  "complexes" : [ {
+    "propCd" : "0000000027",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "타마라 제주 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647380009",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "타마라제주호텔" ]
+}, {
+  "propCd" : "0000000148",
+  "propShrtNm" : " (주)더즐거운상상(센텀마크호텔양양)",
+  "propFullNm" : " (주)더즐거운상상(센텀마크호텔양양)",
+  "complexes" : [ {
+    "propCd" : "0000000148",
+    "cmpxCd" : "00001",
+    "cmpxNm" : " (주)더즐거운상상(센텀마크호텔양양)",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336734000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ " (주)더즐거운쌍쌍(센텀마크호텔양양)", "(주)더즐거운상상(센텀마크호텔양양)" ]
+}, {
+  "propCd" : "0000000026",
+  "propShrtNm" : "부엉이 호텔",
+  "propFullNm" : "부엉이 호텔",
+  "complexes" : [ {
+    "propCd" : "0000000026",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "부엉이 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0557867877",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "부엉이호텔" ]
+}, {
+  "propCd" : "0000000147",
+  "propShrtNm" : "주식회사 노스하버호텔",
+  "propFullNm" : "주식회사 노스하버호텔",
+  "complexes" : [ {
+    "propCd" : "0000000147",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "노스하버호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01038848255",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "노스하버호텔", "주식회사노스하버호텔" ]
+}, {
+  "propCd" : "0000000029",
+  "propShrtNm" : "(주)비엠케이코리아",
+  "propFullNm" : "코업시티호텔 오류동",
+  "complexes" : [ {
+    "propCd" : "0000000029",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "코업시티호텔스테이코",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "18778908",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "비엠케이코리아", "코업시티호텔 오류동", "코업시티호텔스테이코" ]
+}, {
+  "propCd" : "0000000028",
+  "propShrtNm" : "제이바다호텔",
+  "propFullNm" : "제이바다호텔",
+  "complexes" : [ {
+    "propCd" : "0000000028",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "제이바다호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0647445672",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000149",
+  "propShrtNm" : "주식회사 세안피엠씨",
+  "propFullNm" : "주식회사 세안피엠씨",
+  "complexes" : [ {
+    "propCd" : "0000000149",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "풍남관광호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0632317900",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "세안피엠씨", "주식회사 세안피엠시", "주식회사 쎄안피엠씨", "주식회사세안피엠씨", "풍남관광호텔" ]
+}, {
+  "propCd" : "0000000030",
+  "propShrtNm" : "리센오션파크호텔",
+  "propFullNm" : "리센오션파크호텔",
+  "complexes" : [ {
+    "propCd" : "0000000030",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "리센오션파크호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0336371102",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000151",
+  "propShrtNm" : "디 스테이 호스텔 동대문",
+  "propFullNm" : "디스테이 호스텔 동대문",
+  "complexes" : [ {
+    "propCd" : "0000000151",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "디스테이 호스텔 동대문",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0200000000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "디 스태이 호스텔 동대문", "디스테이호스텔동대문", "디스테이 호스텔 동대문" ]
+}, {
+  "propCd" : "0000000150",
+  "propShrtNm" : "오헤브데이 호텔",
+  "propFullNm" : "오헤브데이 호텔",
+  "complexes" : [ {
+    "propCd" : "0000000150",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "오헤브데이 호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0636368000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "오헤브데이호텔" ]
+}, {
+  "propCd" : "0000000032",
+  "propShrtNm" : "에스알디 ",
+  "propFullNm" : "에스알디 주식회사 서귀포지점",
+  "complexes" : [ {
+    "propCd" : "0000000032",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "엠스테이호텔 제주",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0648006000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "에스알디", "에스알디 주식회사 서귀포지점", "엠스테이호텔 제주" ]
+}, {
+  "propCd" : "0000000153",
+  "propShrtNm" : "망고스틴",
+  "propFullNm" : "망고스틴",
+  "complexes" : [ {
+    "propCd" : "0000000153",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "망고스틴",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "01098844325",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000031",
+  "propShrtNm" : "베이튼호텔",
+  "propFullNm" : "베이튼호텔",
+  "complexes" : [ {
+    "propCd" : "0000000031",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "베이튼호텔",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0222692550",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ ]
+}, {
+  "propCd" : "0000000152",
+  "propShrtNm" : "Felix by STX",
+  "propFullNm" : "에스티엑스서비스",
+  "complexes" : [ {
+    "propCd" : "0000000152",
+    "cmpxCd" : "00001",
+    "cmpxNm" : "Felix Hotel by STX",
+    "cmpxTp" : "R",
+    "cmpxReprTel" : "0519695000",
+    "mobileNos" : [ ]
+  } ],
+  "aliases" : [ "FelixbySTX", "에스티엑스서비스", "Felix Hotel by STX" ]
+} ]
