@@ -18,10 +18,12 @@ application-local.properties
 
 # Claude Code
 .claude/
+.omc/
 
 # 런타임 상태 (data/ 로 이동됨)
 data/last_sync.txt
 data/failed_index.txt
+data/phone_lookup.json
 logs/
 
 # 실험/임시 파일

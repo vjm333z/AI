@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS CALL_QUEUE (
     call_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
 
     -- KT RPA 메타데이터 (파일명에서 파싱)
+    audio_file      VARCHAR(255),           -- 원본 파일명 (중복 체크 키)
     caller_no       VARCHAR(20),            -- 발신번호
     receiver_no     VARCHAR(20),            -- 수신번호
     call_dt         DATETIME,               -- 통화 일시
