@@ -521,12 +521,20 @@ def main():
     if hotels:
         matched_hotel, matched_cmpx = None, None
 
-        matched_hotel, matched_cmpx = find_hotel_by_call_no(receiver_no, hotels)
+        # 발신번호 우선 시도 (호텔 → 다올 비전 인바운드가 일반적), 실패 시 수신번호
+        matched_hotel, matched_cmpx = find_hotel_by_call_no(caller_no, hotels)
         if matched_hotel:
             prop_cd  = matched_hotel.get("propCd")
             cmpx_cd  = matched_cmpx.get("cmpxCd") if matched_cmpx else None
-            print(f"[호텔] 수신번호 매칭: {matched_hotel.get('propShrtNm')} "
+            print(f"[호텔] 발신번호 매칭: {matched_hotel.get('propShrtNm')} "
                   f"(prop_cd={prop_cd}, cmpx_cd={cmpx_cd})")
+        if not matched_hotel:
+            matched_hotel, matched_cmpx = find_hotel_by_call_no(receiver_no, hotels)
+            if matched_hotel:
+                prop_cd  = matched_hotel.get("propCd")
+                cmpx_cd  = matched_cmpx.get("cmpxCd") if matched_cmpx else None
+                print(f"[호텔] 수신번호 매칭: {matched_hotel.get('propShrtNm')} "
+                      f"(prop_cd={prop_cd}, cmpx_cd={cmpx_cd})")
 
         if not matched_hotel and phone_lookup:
             matched_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)

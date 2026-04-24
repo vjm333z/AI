@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
+
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -160,7 +160,7 @@ public class RagService {
     private List<Map<String, Object>> applyMMR(List<Map<String, Object>> candidates, int topK) {
         if (!dedupEnabled || candidates == null || candidates.size() <= topK) {
             return candidates == null ? new ArrayList<>()
-                    : candidates.stream().limit(topK).collect(Collectors.toList());
+                    : candidates.stream().limit(topK).toList();
         }
         List<Map<String, Object>> remaining = new ArrayList<>(candidates);
         List<Map<String, Object>> selected = new ArrayList<>();
@@ -201,10 +201,8 @@ public class RagService {
     }
 
     private double getMmrRelevance(Map<String, Object> c) {
-        Object rs = c.get("rerank_score");
-        if (rs instanceof Number) return ((Number) rs).doubleValue();
-        Object s = c.get("score");
-        return s instanceof Number ? ((Number) s).doubleValue() : 0.0;
+        if (c.get("rerank_score") instanceof Number n) return n.doubleValue();
+        return c.get("score") instanceof Number n ? n.doubleValue() : 0.0;
     }
 
     @SuppressWarnings("unchecked")
@@ -271,11 +269,8 @@ public class RagService {
                 int rerankTopK = dedupEnabled ? filteredCases.size() : finalTopK;
                 List<Map<String, Object>> reranked = rerankerService.rerank(question, filteredCases, rerankTopK);
                 List<Map<String, Object>> afterMin = reranked.stream()
-                        .filter(c -> {
-                            Object rs = c.get("rerank_score");
-                            return rs instanceof Number && ((Number) rs).doubleValue() >= rerankMinScore;
-                        })
-                        .collect(Collectors.toList());
+                        .filter(c -> c.get("rerank_score") instanceof Number n && n.doubleValue() >= rerankMinScore)
+                        .toList();
                 log.info("Rerank {}건 → min-score({}) 컷 {}건 → MMR({}) 최종 {}건",
                         reranked.size(), rerankMinScore, afterMin.size(),
                         dedupEnabled ? "ON" : "OFF", finalTopK);
@@ -454,7 +449,7 @@ public class RagService {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("total", all.size());
         r.put("distinct", failureTracker.distinctSeqNos().size());
-        r.put("samples", all.stream().limit(10).collect(Collectors.toList()));
+        r.put("samples", all.stream().limit(10).toList());
         // 사유별 집계 (상위 10종)
         Map<String, Long> byReason = all.stream()
                 .collect(Collectors.groupingBy(
@@ -486,8 +481,8 @@ public class RagService {
         // 3-FAQ. FAQ 검색 (type=FAQ 필터, propCd 무관, reranker 미적용)
         List<Map<String, Object>> faqRaw = qdrantService.searchIn(collectionName, queryVector, faqTopK, null, "FAQ");
         List<Map<String, Object>> faqResults = faqRaw.stream()
-                .filter(c -> c.get("score") instanceof Number && ((Number) c.get("score")).doubleValue() >= scoreThreshold)
-                .collect(Collectors.toList());
+                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= scoreThreshold)
+                .toList();
         log.info("FAQ 검색 결과: {}건 (threshold 후: {}건)", faqRaw.size(), faqResults.size());
 
         // 3. Qdrant에서 REAL Top N 검색 (reranker가 있으면 넉넉히, 없으면 finalTopK만)
@@ -496,8 +491,8 @@ public class RagService {
 
         // 4. 유사도 점수 필터
         List<Map<String, Object>> filteredCases = similarCases.stream()
-                .filter(c -> c.get("score") instanceof Number && ((Number) c.get("score")).doubleValue() >= scoreThreshold)
-                .collect(Collectors.toList());
+                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= scoreThreshold)
+                .toList();
 
         log.info("유사 사례 검색 결과: {}건", similarCases.size());
         log.info("필터 후 사례: {}건", filteredCases.size());
@@ -546,8 +541,8 @@ public class RagService {
         int fetchK = rerankerEnabled ? searchTopK : finalTopK;
         List<Map<String, Object>> similarCases = qdrantService.searchIn(collectionName, queryVector, fetchK, propCd, "REAL");
         List<Map<String, Object>> filteredCases = similarCases.stream()
-                .filter(c -> ((Number) c.get("score")).doubleValue() >= scoreThreshold)
-                .collect(Collectors.toList());
+                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= scoreThreshold)
+                .toList();
 
         List<Map<String, Object>> finalCases = rankAndDiversify(question, filteredCases);
 
@@ -596,8 +591,7 @@ public class RagService {
             s.put("title", title);
             s.put("report", report);
             samplePayloads.add(s);
-            Object id = point.get("id");
-            if (id instanceof Number) sampleIds.add(((Number) id).longValue());
+            if (point.get("id") instanceof Number id) sampleIds.add(id.longValue());
         }
 
         log.info("카테고리 분석 시작: 전체 {}건 중 {}건 샘플링", all.size(), n);
@@ -662,6 +656,18 @@ public class RagService {
         return sources;
     }
 
+    /** CALL_QUEUE 승인 후 단건 즉시 인덱싱. 실패 시 failureTracker에 기록하고 예외 전파. */
+    public void indexSingle(KokCallMntrDto dto) throws Exception {
+        String text = dto.toEmbeddingText();
+        if (text.isEmpty()) {
+            log.warn("indexSingle 스킵 — 빈 본문 seq_no={}", dto.getSeqNo());
+            return;
+        }
+        List<Double> vector = ollamaService.embed(buildEmbText(dto));
+        qdrantService.upsertTo(qdrantService.getDefaultCollection(), dto.getSeqNo(), vector, dto, buildHotelPayload(dto));
+        log.info("indexSingle 완료 seq_no={}", dto.getSeqNo());
+    }
+
     public String indexUpdated() throws Exception {
         if (!indexing.compareAndSet(false, true)) {
             log.warn("indexUpdated 호출됐지만 이미 다른 적재 작업이 진행 중");
@@ -709,7 +715,7 @@ public class RagService {
         try {
             File file = Paths.get(dataDir, SYNC_FILE).toFile();
             if (!file.exists()) return SYNC_FILE_DEFAULT;
-            String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8).trim();
+            var content = Files.readString(file.toPath()).trim();
             if (!DATE_PATTERN.matcher(content).matches()) {
                 log.warn("{} 내용이 YYYY-MM-DD 형식 아님: '{}' → 기본값 {} 사용",
                         SYNC_FILE, content, SYNC_FILE_DEFAULT);
@@ -727,7 +733,7 @@ public class RagService {
         Path target = Paths.get(dataDir, SYNC_FILE);
         Path tmp = Paths.get(dataDir, SYNC_FILE + ".tmp");
         try {
-            Files.write(tmp, dt.getBytes(StandardCharsets.UTF_8));
+            Files.writeString(tmp, dt);
             try {
                 Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException e) {

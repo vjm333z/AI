@@ -73,9 +73,21 @@ services:
       - ./stt/sql:/docker-entrypoint-initdb.d   # 초기 DDL 자동 실행
     restart: unless-stopped
 
+  portainer:
+    image: portainer/portainer-ce
+    container_name: portainer
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    restart: unless-stopped
+
 volumes:
   qdrant_storage:
   ollama_models:
   reranker_cache:
   app_data:
   mariadb_local_data:
+  portainer_data:
+

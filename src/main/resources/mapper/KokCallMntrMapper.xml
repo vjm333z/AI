@@ -92,4 +92,14 @@
         AND TRIM(A.FEEDBACK) != ''
         AND A.FEEDBACK_YN = 'Y'
     </select>
+
+    <insert id="insertFromQueue" parameterType="com.recallai.dto.KokCallMntrDto"
+            useGeneratedKeys="true" keyProperty="seqNo">
+        INSERT INTO KOK_CALL_MNTR
+            (PROP_CD, CMPX_CD, TITLE, REPORT, FEEDBACK, FEEDBACK_YN, R_DT)
+        VALUES
+            (#{propCd}, #{cmpxCd}, #{title}, #{report}, #{feedback}, 'Y',
+             IFNULL(#{rDt}, DATE_FORMAT(NOW(), '%Y-%m-%d')))
+    </insert>
+
 </mapper>

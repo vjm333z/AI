@@ -16,4 +16,7 @@ public interface KokCallMntrMapper {
 
     /** phone_lookup용 — PROP_CD + REPORT만 조회 (연락처 파싱용) */
     List<KokCallMntrDto> selectForPhoneLookup();
+
+    /** CALL_QUEUE 승인 시 KOK_CALL_MNTR에 신규 등록. 생성된 SEQ_NO를 dto.seqNo에 채워줌 */
+    void insertFromQueue(KokCallMntrDto dto);
 }
