@@ -29,7 +29,7 @@ management:
 ollama:
   url: ${OLLAMA_URL:http://localhost:11434}
   model: bge-m3
-timeout-ms: 30000          # 긴 텍스트 임베딩 여유
+  timeout-ms: 30000          # 긴 텍스트 임베딩 여유
 
 # Qdrant 설정
 qdrant:
@@ -72,3 +72,4 @@ groq:
   api-key: ${GROQ_API_KEY}
   model: llama-3.3-70b-versatile
   url: https://api.groq.com/openai/v1/chat/completions
+  timeout-ms: 30000

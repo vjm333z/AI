@@ -2,6 +2,7 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.*;
 
@@ -38,12 +40,24 @@ public class GroqService implements TemplatizeService {
     @Value("${groq.url}")
     private String groqUrl;
 
+    @Value("${groq.timeout-ms:30000}")
+    private int timeoutMs;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final CloseableHttpClient httpClient = HttpClients.createDefault();
+    private CloseableHttpClient httpClient;
+
+    @PostConstruct
+    private void init() {
+        RequestConfig config = RequestConfig.custom()
+                .setConnectTimeout(3000)
+                .setSocketTimeout(timeoutMs)
+                .build();
+        this.httpClient = HttpClients.custom().setDefaultRequestConfig(config).build();
+    }
 
     @PreDestroy
     public void destroy() {
-        try { httpClient.close(); } catch (Exception ignored) {}
+        try { if (httpClient != null) httpClient.close(); } catch (Exception ignored) {}
     }
 
     public String ask(String question, List<Map<String, Object>> similarCases) throws Exception {
@@ -124,7 +138,11 @@ public class GroqService implements TemplatizeService {
             log.debug("Groq 응답: {}", responseBody);
 
             JsonNode root = objectMapper.readTree(responseBody);
-            return root.get("choices").get(0).get("message").get("content").asText();
+            JsonNode choices = root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                throw new RuntimeException("Groq 응답에 choices 없음: " + responseBody);
+            }
+            return choices.get(0).get("message").get("content").asText();
         }
     }
 
@@ -202,7 +220,11 @@ public class GroqService implements TemplatizeService {
                 throw new RuntimeException("Groq 카테고리 분석 실패 status=" + status + " body=" + responseBody);
             }
             JsonNode root = objectMapper.readTree(responseBody);
-            return root.get("choices").get(0).get("message").get("content").asText();
+            JsonNode choices = root.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                throw new RuntimeException("Groq 카테고리 분석 응답에 choices 없음: " + responseBody);
+            }
+            return choices.get(0).get("message").get("content").asText();
         }
     }
 
@@ -296,7 +318,9 @@ public class GroqService implements TemplatizeService {
                     return null;
                 }
                 JsonNode root = objectMapper.readTree(responseBody);
-                String content = root.get("choices").get(0).get("message").get("content").asText();
+                JsonNode choices = root.get("choices");
+                if (choices == null || choices.isEmpty()) return null;
+                String content = choices.get(0).get("message").get("content").asText();
                 JsonNode parsed = objectMapper.readTree(content);
                 Map<String, Object> result = new LinkedHashMap<>();
                 for (String k : new String[]{"core_question", "situation", "cause", "solution"}) {

@@ -486,7 +486,7 @@ public class RagService {
         // 3-FAQ. FAQ 검색 (type=FAQ 필터, propCd 무관, reranker 미적용)
         List<Map<String, Object>> faqRaw = qdrantService.searchIn(collectionName, queryVector, faqTopK, null, "FAQ");
         List<Map<String, Object>> faqResults = faqRaw.stream()
-                .filter(c -> ((Number) c.get("score")).doubleValue() >= scoreThreshold)
+                .filter(c -> c.get("score") instanceof Number && ((Number) c.get("score")).doubleValue() >= scoreThreshold)
                 .collect(Collectors.toList());
         log.info("FAQ 검색 결과: {}건 (threshold 후: {}건)", faqRaw.size(), faqResults.size());
 
@@ -496,7 +496,7 @@ public class RagService {
 
         // 4. 유사도 점수 필터
         List<Map<String, Object>> filteredCases = similarCases.stream()
-                .filter(c -> ((Number) c.get("score")).doubleValue() >= scoreThreshold)
+                .filter(c -> c.get("score") instanceof Number && ((Number) c.get("score")).doubleValue() >= scoreThreshold)
                 .collect(Collectors.toList());
 
         log.info("유사 사례 검색 결과: {}건", similarCases.size());
@@ -504,8 +504,10 @@ public class RagService {
         for (Map<String, Object> c : filteredCases) {
             Map<String, Object> payload = (Map<String, Object>) c.get("payload");
             log.info("유사사례 점수: {}", c.get("score"));
-            log.info("유사사례 내용: {}", payload.get("report"));
-            log.info("유사사례 답변: {}", payload.get("feedback"));
+            if (payload != null) {
+                log.info("유사사례 내용: {}", payload.get("report"));
+                log.info("유사사례 답변: {}", payload.get("feedback"));
+            }
             log.info("---");
         }
 
@@ -613,6 +615,7 @@ public class RagService {
         List<Map<String, Object>> sources = new ArrayList<>();
         for (Map<String, Object> c : cases) {
             Map<String, Object> payload = (Map<String, Object>) c.get("payload");
+            if (payload == null) continue;
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("seq_no", payload.get("seq_no"));
             s.put("prop_cd", payload.get("prop_cd"));
@@ -647,6 +650,7 @@ public class RagService {
         List<Map<String, Object>> sources = new ArrayList<>();
         for (Map<String, Object> c : cases) {
             Map<String, Object> payload = (Map<String, Object>) c.get("payload");
+            if (payload == null) continue;
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("faq_id", payload.get("faq_id"));
             s.put("category", payload.get("category"));

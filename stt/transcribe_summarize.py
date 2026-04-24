@@ -127,7 +127,7 @@ def transcribe_groq(audio_path: str) -> dict:
         with urllib.request.urlopen(req, timeout=120) as r:
             res = json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        sys.exit(f"❌ Groq STT 실패 HTTP {e.code}: {e.read().decode()[:300]}")
+        raise RuntimeError(f"Groq STT 실패 HTTP {e.code}: {e.read().decode()[:300]}")
 
     elapsed  = time.time() - t0
     duration = res.get("duration", 0)

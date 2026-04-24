@@ -50,7 +50,6 @@
           AND A.FEEDBACK IS NOT NULL
           AND TRIM(A.FEEDBACK) != ''
           AND A.FEEDBACK_YN = 'Y'
-          AND '2025-01-01' > A.R_DT
         ORDER BY A.R_DT DESC
     </select>
 
