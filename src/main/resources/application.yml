@@ -47,6 +47,7 @@ rag:
     top-k: 10              # Qdrant에서 꺼낼 후보 수 (reranker 대비 넉넉히)
     final-top-k: 3         # 최종 LLM에 넘길 문서 수
     score-threshold: 0.65  # Qdrant cosine 유사도 하한 (bge-m3 기준 0.65+가 "관련 있음")
+    faq-score-threshold: 0.80  # FAQ 전용 하한 — FAQ는 정확도 중요하므로 더 높게
   reranker:
     enabled: true          # Python FastAPI reranker 서비스 기동 완료 시 true
     url: ${RERANKER_URL:http://localhost:8000}

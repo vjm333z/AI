@@ -25,7 +25,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from corrections import fix_company_name, WHISPER_INITIAL_PROMPT
+from corrections import fix_company_name, WHISPER_INITIAL_PROMPT, DAOL_RECEIVER_NOS
 from hotel_matcher import (
     load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
     find_hotel_by_call_no, find_hotel_by_phone_lookup,
@@ -41,9 +41,18 @@ if sys.platform == "win32":
     except (AttributeError, ValueError):
         pass
 
+# .env 파일 자동 로드 (환경변수 없을 때 폴백)
+_env_file = Path(__file__).parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
+
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 if not GROQ_API_KEY:
-    sys.exit("❌ GROQ_API_KEY 환경변수가 필요합니다. export GROQ_API_KEY=gsk_...")
+    sys.exit("❌ GROQ_API_KEY 없음. stt/.env 파일에 GROQ_API_KEY=gsk_... 추가하세요.")
 
 GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
@@ -228,7 +237,7 @@ SUMMARIZE_SYSTEM_PROMPT = """너는 호텔 PMS 상담 통화 모노 녹취록을
   "follow_up": "이후 처리 예정 사항 (없으면 '없음')",
   "status": "해결됨 / 처리중 / 추가조사 필요 / 미확인 중 하나",
   "category": "키오스크 / 객실키 / 결제·카드 / 체크인 / PMS기능 / 부킹엔진 / 소모품·시재 / 기타 중 하나",
-  "summary": "3줄 이내 한국어 요약"
+  "summary": "통화 전체를 상세히 서술. 발신자 문의 배경·증상·요청 → 상담원 확인·조치 → 결론·후속사항 순서로 5~10줄 자세한 한국어 서술형 요약. 핵심 조치와 미결 사항은 반드시 포함."
 }
 
 [report·feedback 필드 지침]
@@ -254,7 +263,36 @@ SUMMARIZE_SYSTEM_PROMPT = """너는 호텔 PMS 상담 통화 모노 녹취록을
 7. question / answer_given 은 각각 **inquirer / responder 발화에 근거**해 작성."""
 
 
-def summarize(segments: list, timeout: int = 60) -> dict:
+def _inject_hotel_name(report: str, hotel_short_name: str) -> str:
+    """DB 매칭 호텔명을 문의자 줄 앞에 붙임. LLM이 쓴 담당자/부서 정보는 보존."""
+    if not report or not hotel_short_name:
+        return report
+    def replacer(m):
+        existing = m.group(1).strip()
+        if hotel_short_name in existing:
+            return m.group(0)
+        if not existing or existing == "미확인":
+            return f"문의자 : {hotel_short_name}"
+        return f"문의자 : {hotel_short_name} {existing}"
+    return re.sub(r"문의자\s*:\s*(.*)", replacer, report)
+
+
+def _inject_caller_contact(report: str, caller_no: str, receiver_no: str = None) -> str:
+    """다올 번호를 제외한 상대방 번호를 연락처에 주입."""
+    if not report:
+        return report
+    if caller_no and caller_no not in DAOL_RECEIVER_NOS:
+        contact = caller_no
+    elif receiver_no and receiver_no not in DAOL_RECEIVER_NOS:
+        contact = receiver_no
+    else:
+        contact = caller_no or receiver_no
+    if not contact:
+        return report
+    return re.sub(r"연락처\s*:[ \t]*.*", f"연락처: {contact}", report)
+
+
+def summarize(segments: list, context: dict = None, timeout: int = 60) -> dict:
     """STT 세그먼트 → 화자 분리 대화록 + 구조화 요약 JSON."""
     if not segments:
         return {"error": "빈 세그먼트"}
@@ -264,7 +302,24 @@ def summarize(segments: list, timeout: int = 60) -> dict:
         start = seg.get("start", 0)
         mmss = f"{int(start // 60):d}:{int(start % 60):02d}"
         lines.append(f"[{mmss}] {seg.get('text', '').strip()}")
-    user_input = "\n".join(lines)
+    stt_text = "\n".join(lines)
+
+    if context:
+        meta = ["[통화 메타정보 — 아래 값은 시스템이 확정한 값이므로 report 필드에 그대로 사용할 것]"]
+        if context.get("hotel_name"):
+            meta.append(f"- 문의자(호텔명): {context['hotel_name']}  ← report의 '문의자' 줄에 이 값 그대로 사용")
+        if context.get("caller_no"):
+            meta.append(f"- 연락처(발신번호): {context['caller_no']}  ← report의 '연락처' 줄에 이 값 그대로 사용")
+        if context.get("receiver_no"):
+            is_daol = context.get("receiver_no") in (context.get("daol_nos") or set())
+            meta.append(f"- 수신번호: {context['receiver_no']} ({'다올 비전 측' if is_daol else '상대측'})")
+        if context.get("daol_nos"):
+            meta.append(f"- 다올 비전 수신번호 목록: {', '.join(sorted(context['daol_nos']))}  ← 이 번호들 = 다올 비전 상담원(수신측)")
+        if context.get("call_dt"):
+            meta.append(f"- 통화일시: {context['call_dt']}")
+        user_input = "\n".join(meta) + "\n\n" + stt_text
+    else:
+        user_input = stt_text
 
     body = {
         "model": GROQ_MODEL,
@@ -289,13 +344,27 @@ def summarize(segments: list, timeout: int = 60) -> dict:
 
     print(f"[요약] Groq 호출 (세그먼트 {len(segments)}개, 입력 {len(user_input)}자)...")
     t0 = time.time()
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            res = json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        return {"error": f"HTTP {e.code}: {e.read().decode('utf-8', errors='ignore')[:500]}"}
-    except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}"}
+
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                res = json.loads(r.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="ignore")
+            if e.code == 429:
+                # Rate limit — 에러 메시지에서 대기 시간 파싱
+                import re as _re
+                m = _re.search(r"try again in ([\d.]+)s", body)
+                wait = float(m.group(1)) + 1.0 if m else 15.0
+                print(f"[요약] Rate limit (429) — {wait:.1f}초 후 재시도 (시도 {attempt+1}/4)")
+                time.sleep(wait)
+                continue
+            return {"error": f"HTTP {e.code}: {body[:500]}"}
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+    else:
+        return {"error": "Rate limit 재시도 초과"}
 
     print(f"[요약] 완료 ({time.time()-t0:.1f}초)")
     content = res["choices"][0]["message"]["content"]
@@ -509,10 +578,30 @@ def main():
             seg["text"] = fix_hotel_names(seg["text"], alias_pairs)
         print("[호텔] STT 텍스트 호텔명 보정 완료")
 
-    # Step 2 — 요약
+    # Step 2 — 요약 (phone lookup으로 알 수 있는 컨텍스트 미리 전달)
     summary = None
     if not args.no_summary:
-        summary = summarize(stt_result["segments"])
+        pre_hotel, pre_cmpx = None, None
+        if hotels:
+            pre_hotel, pre_cmpx = find_hotel_by_call_no(caller_no, hotels)
+            if not pre_hotel:
+                pre_hotel, pre_cmpx = find_hotel_by_call_no(receiver_no, hotels)
+            if not pre_hotel and phone_lookup:
+                pre_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
+            if not pre_hotel and phone_lookup and receiver_no:
+                pre_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
+        hotel_display = (pre_cmpx.get("cmpxNm") if pre_cmpx else None) or (pre_hotel.get("propShrtNm") if pre_hotel else None)
+        summarize_ctx = {
+            "caller_no":   caller_no,
+            "receiver_no": receiver_no,
+            "call_dt":     call_dt,
+            "hotel_name":  hotel_display,
+            "prop_cd":     pre_hotel.get("propCd") if pre_hotel else None,
+            "daol_nos":    DAOL_RECEIVER_NOS,
+        }
+        summary = summarize(stt_result["segments"], context=summarize_ctx)
+        if summary and "error" not in summary and caller_no:
+            summary["report"] = _inject_caller_contact(summary.get("report", ""), caller_no, receiver_no)
     else:
         print("[요약] 스킵 (--no-summary)")
 
@@ -579,6 +668,10 @@ def main():
 
         if not matched_hotel:
             print("[호텔] 매칭 실패 — prop_cd=null (상담사가 UI에서 선택 필요)")
+
+        if matched_hotel and summary and "error" not in summary:
+            hotel_nm = (matched_cmpx.get("cmpxNm") if matched_cmpx else None) or matched_hotel.get("propShrtNm", "")
+            summary["report"] = _inject_hotel_name(summary.get("report", ""), hotel_nm)
 
     result = {
         "audio_file":  os.path.basename(audio_path),

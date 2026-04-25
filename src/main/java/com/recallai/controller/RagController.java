@@ -33,6 +33,9 @@ public class RagController {
     @Autowired
     private HotelCacheService hotelCacheService;
 
+    @Autowired
+    private com.recallai.repository.KokCallMntrMapper mapper;
+
     @Value("${qdrant.url}")
     private String qdrantUrl;
 
@@ -189,6 +192,29 @@ public class RagController {
             result.put("message", msg);
         } catch (Exception e) {
             log.error("증분 적재 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /** 단건 즉시 인덱싱 — KOK_CALL_MNTR 저장 직후 호출. seqNo로 레코드 조회 후 Qdrant upsert. */
+    @PostMapping("/index/single/{seqNo}")
+    public Map<String, Object> indexSingle(@PathVariable Integer seqNo) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            java.util.List<com.recallai.dto.KokCallMntrDto> list =
+                    mapper.selectBySeqNos(java.util.Collections.singletonList(seqNo));
+            if (list.isEmpty()) {
+                result.put("success", false);
+                result.put("message", "seq_no=" + seqNo + " 레코드를 찾을 수 없습니다.");
+                return result;
+            }
+            ragService.indexSingle(list.get(0));
+            result.put("success", true);
+            result.put("message", "단건 인덱싱 완료 seq_no=" + seqNo);
+        } catch (Exception e) {
+            log.error("단건 인덱싱 실패 seq_no={}", seqNo, e);
             result.put("success", false);
             result.put("message", e.getMessage());
         }

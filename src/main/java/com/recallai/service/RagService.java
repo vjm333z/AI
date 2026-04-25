@@ -80,6 +80,9 @@ public class RagService {
     @Value("${rag.search.faq-top-k:3}")
     private int faqTopK;
 
+    @Value("${rag.search.faq-score-threshold:0.80}")
+    private double faqScoreThreshold;
+
     @Value("${rag.reranker.enabled:false}")
     private boolean rerankerEnabled;
 
@@ -481,7 +484,7 @@ public class RagService {
         // 3-FAQ. FAQ 검색 (type=FAQ 필터, propCd 무관, reranker 미적용)
         List<Map<String, Object>> faqRaw = qdrantService.searchIn(collectionName, queryVector, faqTopK, null, "FAQ");
         List<Map<String, Object>> faqResults = faqRaw.stream()
-                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= scoreThreshold)
+                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= faqScoreThreshold)
                 .toList();
         log.info("FAQ 검색 결과: {}건 (threshold 후: {}건)", faqRaw.size(), faqResults.size());
 

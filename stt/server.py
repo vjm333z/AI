@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 # ── 경로 설정 ──────────────────────────────────────────────────
 BASE_DIR     = Path(__file__).parent
@@ -80,8 +81,7 @@ def process_recording(file_path: Path):
     try:
         from transcribe_summarize import (
             parse_filename_meta, transcribe_groq,
-            summarize, save_markdown_report,
-            build_alias_pairs, fix_hotel_names,
+            summarize, save_markdown_report, _inject_caller_contact, _inject_hotel_name,
         )
         from hotel_matcher import (
             load_hotels, load_phone_lookup, build_alias_pairs,
@@ -125,8 +125,28 @@ def process_recording(file_path: Path):
             for seg in stt_result.get("segments", []):
                 seg["text"] = fix_hotel_names(seg["text"], alias_pairs)
 
-        # 요약
-        summary = summarize(stt_result["segments"])
+        # 요약 (phone lookup 기반 빠른 사전 매칭 후 컨텍스트 전달)
+        pre_hotel, pre_cmpx = None, None
+        pre_hotel, pre_cmpx = find_hotel_by_call_no(caller_no, hotels)
+        if not pre_hotel:
+            pre_hotel, pre_cmpx = find_hotel_by_call_no(receiver_no, hotels)
+        if not pre_hotel and phone_lookup:
+            pre_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
+        if not pre_hotel and phone_lookup and receiver_no:
+            pre_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
+        hotel_display = (pre_cmpx.get("cmpxNm") if pre_cmpx else None) or (pre_hotel.get("propShrtNm") if pre_hotel else None)
+        from corrections import DAOL_RECEIVER_NOS
+        summarize_ctx = {
+            "caller_no":   caller_no,
+            "receiver_no": receiver_no,
+            "call_dt":     call_dt,
+            "hotel_name":  hotel_display,
+            "prop_cd":     pre_hotel.get("propCd") if pre_hotel else None,
+            "daol_nos":    DAOL_RECEIVER_NOS,
+        }
+        summary = summarize(stt_result["segments"], context=summarize_ctx)
+        if summary and "error" not in summary and caller_no:
+            summary["report"] = _inject_caller_contact(summary.get("report", ""), caller_no, receiver_no)
 
         # 호텔 매칭
         prop_cd, cmpx_cd, matched_hotel, matched_cmpx = None, None, None, None
@@ -175,6 +195,10 @@ def process_recording(file_path: Path):
             if len(complexes) == 1:
                 cmpx_cd = complexes[0].get("cmpxCd")
 
+        if matched_hotel and summary and "error" not in summary:
+            hotel_nm = (matched_cmpx.get("cmpxNm") if matched_cmpx else None) or matched_hotel.get("propShrtNm", "")
+            summary["report"] = _inject_hotel_name(summary.get("report", ""), hotel_nm)
+
         result = {
             "audio_file":  file_path.name,
             "caller_no":   caller_no,
@@ -216,10 +240,17 @@ def process_recording(file_path: Path):
 # ── FastAPI 앱 ─────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"[서버] 시작 — inbox: {INBOX_DIR}, DB: {DB_CFG['host']}:{DB_CFG['port']}")
+    print(f"[서버] 시작 | inbox: {INBOX_DIR}, DB: {DB_CFG['host']}:{DB_CFG['port']}")
     yield
 
 app = FastAPI(title="RecallAI STT Server", version="1.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/api/recording")
@@ -320,6 +351,88 @@ async def recent(limit: int = 20):
             rows = cur.fetchall()
         conn.close()
         return {"count": len(rows), "items": rows}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/queue")
+async def get_queue(status: str = "PENDING", limit: int = 50):
+    """PMS UI용 — CALL_QUEUE 미처리 대기건 목록 (전체 필드)."""
+    try:
+        import pymysql
+        conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
+        with conn.cursor(pymysql.cursors.DictCursor) as cur:
+            cur.execute("""
+                SELECT call_id, audio_file, caller_no, receiver_no, call_dt,
+                       prop_cd, cmpx_cd, category, resolve_status, caller_nm,
+                       call_duration, stt_report, stt_feedback, stt_summary, created_dt, updated_dt
+                FROM CALL_QUEUE
+                WHERE (resolve_status IS NULL OR resolve_status != 'REGISTERED')
+                ORDER BY created_dt DESC
+                LIMIT %s
+            """, (min(limit, 200),))
+            rows = cur.fetchall()
+        conn.close()
+        for r in rows:
+            for k, v in r.items():
+                if hasattr(v, 'isoformat'):
+                    r[k] = v.isoformat()
+        return {"count": len(rows), "items": rows}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.put("/api/queue/{call_id}/status")
+async def update_queue_status(call_id: int, body: dict):
+    """PMS UI용 — 대기건 상태 업데이트 (등록완료·스킵 등)."""
+    new_status = body.get("status", "REGISTERED")
+    try:
+        import pymysql
+        conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE CALL_QUEUE SET resolve_status = %s, updated_dt = NOW() WHERE call_id = %s",
+                (new_status, call_id)
+            )
+            affected = cur.rowcount
+        conn.close()
+        return {"updated": affected, "call_id": call_id, "status": new_status}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/queue/caller-history")
+async def caller_history(phone: str, exclude_id: int = None, limit: int = 10):
+    """동일 발신/수신 번호로 온 이전 통화 이력 조회."""
+    if not phone:
+        return {"count": 0, "items": []}
+    try:
+        import pymysql
+        conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
+        with conn.cursor(pymysql.cursors.DictCursor) as cur:
+            # 발신자 OR 수신자 번호가 일치하는 건 (현재 건 제외)
+            sql = """
+                SELECT call_id, audio_file, caller_no, receiver_no, call_dt,
+                       call_duration, prop_cd, cmpx_cd, resolve_status,
+                       stt_summary, LEFT(stt_report, 300) AS stt_report_preview,
+                       created_dt
+                FROM CALL_QUEUE
+                WHERE (caller_no = %s OR receiver_no = %s)
+            """
+            params = [phone, phone]
+            if exclude_id:
+                sql += " AND call_id != %s"
+                params.append(exclude_id)
+            sql += " ORDER BY call_dt DESC LIMIT %s"
+            params.append(min(limit, 50))
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        conn.close()
+        for r in rows:
+            for k, v in r.items():
+                if hasattr(v, "isoformat"):
+                    r[k] = v.isoformat()
+        return {"count": len(rows), "phone": phone, "items": rows}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 

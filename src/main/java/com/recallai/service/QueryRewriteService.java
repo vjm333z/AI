@@ -90,7 +90,7 @@ public class QueryRewriteService {
                     Map.of("role", "user", "content", "원본 질문: " + original)
                 ),
                 "max_tokens", 150,
-                "temperature", 0.3
+                "temperature", 0
             );
 
             var jsonBytes = objectMapper.writeValueAsBytes(body);
