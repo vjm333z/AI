@@ -13,8 +13,12 @@ inbox/ 에 저장 후 백그라운드에서 STT → CALL_QUEUE 자동 처리.
 import os
 import re
 import shutil
+import threading
 from pathlib import Path
 from contextlib import asynccontextmanager
+
+# 동시 Groq API 호출 방지 — 파일 1개씩 순차 처리
+_PROCESS_LOCK = threading.Lock()
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -72,7 +76,12 @@ def is_already_processed(base_filename: str) -> bool:
 
 # ── 백그라운드 STT 파이프라인 ──────────────────────────────────
 def process_recording(file_path: Path):
-    """inbox/ 파일 → STT → CALL_QUEUE → recordings/ 이동."""
+    """inbox/ 파일 → STT → CALL_QUEUE → recordings/ 이동. 동시 처리 방지 lock 포함."""
+    with _PROCESS_LOCK:
+        _process_recording_inner(file_path)
+
+
+def _process_recording_inner(file_path: Path):
     import sys
     # 같은 디렉토리의 모듈 import 보장
     if str(BASE_DIR) not in sys.path:
@@ -145,8 +154,27 @@ def process_recording(file_path: Path):
             "daol_nos":    DAOL_RECEIVER_NOS,
         }
         summary = summarize(stt_result["segments"], context=summarize_ctx)
-        if summary and "error" not in summary and caller_no:
-            summary["report"] = _inject_caller_contact(summary.get("report", ""), caller_no, receiver_no)
+        if summary and "error" not in summary:
+            from corrections import DAOL_RECEIVER_NOS as _DNOS
+            _contact = None
+            if receiver_no and receiver_no not in _DNOS:
+                _contact = receiver_no
+            elif caller_no and caller_no not in _DNOS:
+                _contact = caller_no
+            else:
+                _contact = caller_no or receiver_no
+            if _contact and summary.get("report"):
+                _lines = []
+                _seen_contact = False
+                for _line in summary["report"].split("\n"):
+                    if "연락처" in _line and ":" in _line:
+                        if not _seen_contact:
+                            _lines.append(f"연락처: {_contact}")
+                            _seen_contact = True
+                    else:
+                        _lines.append(_line)
+                summary["report"] = "\n".join(_lines)
+                print(f"[연락처 주입] {_contact}")
 
         # 호텔 매칭
         prop_cd, cmpx_cd, matched_hotel, matched_cmpx = None, None, None, None

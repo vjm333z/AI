@@ -96,17 +96,17 @@ def save_to_db(result: dict, db_cfg: dict) -> int:
              %(stt_raw)s, %(stt_report)s, %(stt_feedback)s, %(stt_summary)s,
              %(caller_nm)s, %(contact_no)s, %(category)s, %(resolve_status)s)
         ON DUPLICATE KEY UPDATE
-            prop_cd        = VALUES(prop_cd),
-            cmpx_cd        = VALUES(cmpx_cd),
-            call_duration  = VALUES(call_duration),
-            stt_raw        = VALUES(stt_raw),
-            stt_report     = VALUES(stt_report),
-            stt_feedback   = VALUES(stt_feedback),
-            stt_summary    = VALUES(stt_summary),
-            caller_nm      = VALUES(caller_nm),
-            contact_no     = VALUES(contact_no),
-            category       = VALUES(category),
-            resolve_status = VALUES(resolve_status),
+            prop_cd        = COALESCE(VALUES(prop_cd),        prop_cd),
+            cmpx_cd        = COALESCE(VALUES(cmpx_cd),        cmpx_cd),
+            call_duration  = COALESCE(VALUES(call_duration),  call_duration),
+            stt_raw        = COALESCE(VALUES(stt_raw),        stt_raw),
+            stt_report     = COALESCE(VALUES(stt_report),     stt_report),
+            stt_feedback   = COALESCE(VALUES(stt_feedback),   stt_feedback),
+            stt_summary    = COALESCE(VALUES(stt_summary),    stt_summary),
+            caller_nm      = COALESCE(VALUES(caller_nm),      caller_nm),
+            contact_no     = COALESCE(VALUES(contact_no),     contact_no),
+            category       = COALESCE(VALUES(category),       category),
+            resolve_status = COALESCE(VALUES(resolve_status), resolve_status),
             updated_dt     = CURRENT_TIMESTAMP
     """
     try:

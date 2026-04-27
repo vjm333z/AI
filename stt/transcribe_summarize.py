@@ -23,6 +23,7 @@ import re
 import sys
 import time
 import urllib.request
+import requests as _requests
 from pathlib import Path
 
 from corrections import fix_company_name, WHISPER_INITIAL_PROMPT, DAOL_RECEIVER_NOS
@@ -48,7 +49,7 @@ if _env_file.exists():
         _line = _line.strip()
         if _line and not _line.startswith("#") and "=" in _line:
             _k, _v = _line.split("=", 1)
-            os.environ.setdefault(_k.strip(), _v.strip())
+            os.environ[_k.strip()] = _v.strip()
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 if not GROQ_API_KEY:
@@ -122,21 +123,16 @@ def transcribe_groq(audio_path: str) -> dict:
         "response_format": "verbose_json",
         "prompt": WHISPER_INITIAL_PROMPT,
     }
-    body, content_type = _build_multipart(fields, os.path.basename(audio_path), file_data)
-
-    req = urllib.request.Request(
-        GROQ_STT_URL, method="POST", data=body,
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": content_type,
-            "User-Agent": "Mozilla/5.0",
-        },
+    resp = _requests.post(
+        GROQ_STT_URL,
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+        files={"file": (os.path.basename(audio_path), file_data, "audio/mpeg")},
+        data=fields,
+        timeout=120,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as r:
-            res = json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Groq STT 실패 HTTP {e.code}: {e.read().decode()[:300]}")
+    if not resp.ok:
+        raise RuntimeError(f"Groq STT 실패 HTTP {resp.status_code}: {resp.text[:300]}")
+    res = resp.json()
 
     elapsed  = time.time() - t0
     duration = res.get("duration", 0)
@@ -332,35 +328,27 @@ def summarize(segments: list, context: dict = None, timeout: int = 60) -> dict:
         "response_format": {"type": "json_object"},
     }
 
-    req = urllib.request.Request(
-        GROQ_URL, method="POST",
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0",
-        },
-    )
-
     print(f"[요약] Groq 호출 (세그먼트 {len(segments)}개, 입력 {len(user_input)}자)...")
     t0 = time.time()
 
     for attempt in range(4):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                res = json.loads(r.read().decode("utf-8"))
-            break
-        except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="ignore")
-            if e.code == 429:
-                # Rate limit — 에러 메시지에서 대기 시간 파싱
-                import re as _re
-                m = _re.search(r"try again in ([\d.]+)s", body)
-                wait = float(m.group(1)) + 1.0 if m else 15.0
+            resp = _requests.post(
+                GROQ_URL,
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                json=body,
+                timeout=timeout,
+            )
+            if resp.status_code == 429:
+                m = re.search(r"try again in ([\d.]+)s", resp.text)
+                wait = float(m.group(1)) + 2.0 if m else 60.0
                 print(f"[요약] Rate limit (429) — {wait:.1f}초 후 재시도 (시도 {attempt+1}/4)")
                 time.sleep(wait)
                 continue
-            return {"error": f"HTTP {e.code}: {body[:500]}"}
+            if not resp.ok:
+                return {"error": f"HTTP {resp.status_code}: {resp.text[:500]}"}
+            res = resp.json()
+            break
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
     else:
