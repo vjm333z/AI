@@ -58,6 +58,26 @@ services:
       - reranker
     restart: unless-stopped
 
+  stt:
+    build: ./stt
+    container_name: stt
+    ports:
+      - "8001:8001"
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      DB_HOST: mariadb-local
+      DB_PORT: 3306
+      DB_USER: recallai
+      DB_PASSWORD: recallai
+      DB_NAME: recallai
+    volumes:
+      - stt_inbox:/app/inbox
+      - stt_recordings:/app/recordings
+      - stt_results:/app/results
+    depends_on:
+      - mariadb-local
+    restart: unless-stopped
+
   mariadb-local:
     image: mariadb:10.11
     container_name: mariadb-local
@@ -90,4 +110,7 @@ volumes:
   app_data:
   mariadb_local_data:
   portainer_data:
+  stt_inbox:
+  stt_recordings:
+  stt_results:
 

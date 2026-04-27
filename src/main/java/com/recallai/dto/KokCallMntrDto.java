@@ -23,8 +23,17 @@ public class KokCallMntrDto {
 
     public String toEmbeddingText() {
         String cleaned = cleanDisplay(report);
+
+        // "문의내역:" 이전 메타 정보(접수번호 등) 제거 — 문의 본문만 임베딩
         int idx = cleaned.indexOf("문의내역:");
         if (idx >= 0) cleaned = cleaned.substring(idx + 5).trim();
+
+        // "통화요약:" 이후는 AI 생성 요약이라 원본 문의 의도와 다를 수 있어 제외
+        // Q-Q 매칭 취지(문의끼리 비교)에도 맞지 않음
+        // TODO: 실제 DB 데이터에서 패턴 확인 후 필요 없으면 제거
+        int summaryIdx = cleaned.indexOf("통화요약:");
+        if (summaryIdx >= 0) cleaned = cleaned.substring(0, summaryIdx).trim();
+
         return cleaned.length() > 1000 ? cleaned.substring(0, 1000) : cleaned;
     }
 
