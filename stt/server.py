@@ -56,13 +56,13 @@ def normalize_filename(filename: str) -> str:
 
 # ── 이미 처리된 파일 여부 확인 ─────────────────────────────────
 def is_already_processed(base_filename: str) -> bool:
-    """CALL_QUEUE에 동일 파일명 존재 여부 확인."""
+    """AIA_CALL_RECORDING에 동일 파일명 존재 여부 확인."""
     try:
         import pymysql
         conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT 1 FROM CALL_QUEUE WHERE audio_file = %s LIMIT 1",
+                "SELECT 1 FROM AIA_CALL_RECORDING WHERE BASE_FILE_NM = %s LIMIT 1",
                 (base_filename,)
             )
             row = cur.fetchone()
@@ -76,9 +76,14 @@ def is_already_processed(base_filename: str) -> bool:
 
 # ── 백그라운드 STT 파이프라인 ──────────────────────────────────
 def process_recording(file_path: Path):
-    """inbox/ 파일 → STT → CALL_QUEUE → recordings/ 이동. 동시 처리 방지 lock 포함."""
-    with _PROCESS_LOCK:
-        _process_recording_inner(file_path)
+    """inbox/ 파일 → STT → AIA DB → recordings/ 이동. 동시 처리 방지 lock 포함."""
+    try:
+        with _PROCESS_LOCK:
+            _process_recording_inner(file_path)
+    except BaseException as e:
+        import traceback
+        print(f"[서버] process_recording 치명적 예외 ({file_path.name}): {e}", flush=True)
+        traceback.print_exc()
 
 
 def _process_recording_inner(file_path: Path):
@@ -95,10 +100,10 @@ def _process_recording_inner(file_path: Path):
         from hotel_matcher import (
             load_hotels, load_phone_lookup, build_alias_pairs,
             fix_hotel_names, find_hotel_by_call_no,
-            find_hotel_by_phone_lookup, find_hotel_from_text,
+            find_hotel_by_phone_lookup, find_hotel_from_text, add_alias,
             find_cmpx_from_text,
         )
-        from db_utils import lookup_caller_history, save_to_db
+        from db_utils import lookup_caller_history, save_to_aia
     except ImportError as e:
         print(f"[서버] import 실패: {e}")
         return
@@ -127,6 +132,13 @@ def _process_recording_inner(file_path: Path):
 
         # STT
         stt_result = transcribe_groq(audio_path)
+
+        # 3초 미만 통화 스킵 (잡음·오발신 등 파악 불가)
+        duration = stt_result.get("duration_sec", 0)
+        if duration < 3:
+            print(f"[서버] 통화 {duration:.1f}초 — 3초 미만이라 스킵 ({file_path.name})")
+            shutil.move(str(file_path), str(DONE_DIR / file_path.name))
+            return
 
         # 호텔명 보정
         if alias_pairs:
@@ -211,31 +223,44 @@ def _process_recording_inner(file_path: Path):
                 summary.get("report", ""),
                 stt_result.get("text", "")[:500],
             ]))
-            matched_hotel = find_hotel_from_text(search_text, hotels)
+            matched_hotel, alias_candidate = find_hotel_from_text(search_text, hotels)
             if matched_hotel:
                 prop_cd      = matched_hotel.get("propCd")
                 matched_cmpx = find_cmpx_from_text(search_text, matched_hotel)
                 if matched_cmpx:
                     cmpx_cd = matched_cmpx.get("cmpxCd")
+                if alias_candidate and hotels_path:
+                    add_alias(hotels_path, prop_cd, alias_candidate)
 
         if matched_hotel and cmpx_cd is None:
             complexes = matched_hotel.get("complexes", [])
             if len(complexes) == 1:
                 cmpx_cd = complexes[0].get("cmpxCd")
+                if not matched_cmpx:
+                    matched_cmpx = complexes[0]
 
-        if matched_hotel and summary and "error" not in summary:
-            hotel_nm = (matched_cmpx.get("cmpxNm") if matched_cmpx else None) or matched_hotel.get("propShrtNm", "")
-            summary["report"] = _inject_hotel_name(summary.get("report", ""), hotel_nm)
+        cmpx_nm = (matched_cmpx.get("cmpxNm") if matched_cmpx else None) \
+                  or (matched_hotel.get("propShrtNm") if matched_hotel else None)
+
+        import hashlib
+        file_bytes  = file_path.read_bytes()
+        sha256_hash = hashlib.sha256(file_bytes).hexdigest()
 
         result = {
-            "audio_file":  file_path.name,
-            "caller_no":   caller_no,
-            "receiver_no": receiver_no,
-            "call_dt":     call_dt,
-            "prop_cd":     prop_cd,
-            "cmpx_cd":     cmpx_cd,
-            "stt":         stt_result,
-            "summary":     summary,
+            "audio_file":   file_path.name,
+            "base_file_nm": file_path.name,
+            "file_path":    str(file_path),
+            "file_size":    file_path.stat().st_size,
+            "sha256":       sha256_hash,
+            "caller_no":    caller_no,
+            "receiver_no":  receiver_no,
+            "call_dt":      call_dt,
+            "channel_seq":  int(file_path.stem.split("-")[-1]) if file_path.stem.split("-")[-1].isdigit() else None,
+            "prop_cd":      prop_cd,
+            "cmpx_cd":      cmpx_cd,
+            "cmpx_nm":      cmpx_nm,
+            "stt":          stt_result,
+            "summary":      summary,
         }
 
         # JSON 저장
@@ -244,9 +269,9 @@ def _process_recording_inner(file_path: Path):
             json.dump(result, f, ensure_ascii=False, indent=2)
 
         # DB 저장
-        call_id = save_to_db(result, DB_CFG)
-        if call_id:
-            result["call_id"] = call_id
+        rec_seq_no = save_to_aia(result, DB_CFG)
+        if rec_seq_no:
+            result["rec_seq_no"] = rec_seq_no
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
 
@@ -359,110 +384,19 @@ async def status():
     }
 
 
-@app.get("/api/admin/recent")
-async def recent(limit: int = 20):
-    """CALL_QUEUE 최근 처리 내역 — 처리 결과 확인·디버깅용."""
-    try:
-        import pymysql
-        conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
-        with conn.cursor(pymysql.cursors.DictCursor) as cur:
-            cur.execute("""
-                SELECT call_id, audio_file, caller_no, receiver_no, call_dt,
-                       prop_cd, category, resolve_status, caller_nm,
-                       LEFT(stt_report, 120) AS stt_report_preview,
-                       LEFT(stt_feedback, 120) AS stt_feedback_preview,
-                       created_dt, updated_dt
-                FROM CALL_QUEUE
-                ORDER BY created_dt DESC
-                LIMIT %s
-            """, (min(limit, 100),))
-            rows = cur.fetchall()
-        conn.close()
-        return {"count": len(rows), "items": rows}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.get("/api/queue")
-async def get_queue(status: str = "PENDING", limit: int = 50):
-    """PMS UI용 — CALL_QUEUE 미처리 대기건 목록 (전체 필드)."""
-    try:
-        import pymysql
-        conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
-        with conn.cursor(pymysql.cursors.DictCursor) as cur:
-            cur.execute("""
-                SELECT call_id, audio_file, caller_no, receiver_no, call_dt,
-                       prop_cd, cmpx_cd, category, resolve_status, caller_nm,
-                       call_duration, stt_report, stt_feedback, stt_summary, created_dt, updated_dt
-                FROM CALL_QUEUE
-                WHERE (resolve_status IS NULL OR resolve_status != 'REGISTERED')
-                ORDER BY created_dt DESC
-                LIMIT %s
-            """, (min(limit, 200),))
-            rows = cur.fetchall()
-        conn.close()
-        for r in rows:
-            for k, v in r.items():
-                if hasattr(v, 'isoformat'):
-                    r[k] = v.isoformat()
-        return {"count": len(rows), "items": rows}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.put("/api/queue/{call_id}/status")
-async def update_queue_status(call_id: int, body: dict):
-    """PMS UI용 — 대기건 상태 업데이트 (등록완료·스킵 등)."""
-    new_status = body.get("status", "REGISTERED")
-    try:
-        import pymysql
-        conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE CALL_QUEUE SET resolve_status = %s, updated_dt = NOW() WHERE call_id = %s",
-                (new_status, call_id)
-            )
-            affected = cur.rowcount
-        conn.close()
-        return {"updated": affected, "call_id": call_id, "status": new_status}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.get("/api/queue/caller-history")
-async def caller_history(phone: str, exclude_id: int = None, limit: int = 10):
-    """동일 발신/수신 번호로 온 이전 통화 이력 조회."""
-    if not phone:
-        return {"count": 0, "items": []}
-    try:
-        import pymysql
-        conn = pymysql.connect(**DB_CFG, charset="utf8mb4", autocommit=True)
-        with conn.cursor(pymysql.cursors.DictCursor) as cur:
-            # 발신자 OR 수신자 번호가 일치하는 건 (현재 건 제외)
-            sql = """
-                SELECT call_id, audio_file, caller_no, receiver_no, call_dt,
-                       call_duration, prop_cd, cmpx_cd, resolve_status,
-                       stt_summary, LEFT(stt_report, 300) AS stt_report_preview,
-                       created_dt
-                FROM CALL_QUEUE
-                WHERE (caller_no = %s OR receiver_no = %s)
-            """
-            params = [phone, phone]
-            if exclude_id:
-                sql += " AND call_id != %s"
-                params.append(exclude_id)
-            sql += " ORDER BY call_dt DESC LIMIT %s"
-            params.append(min(limit, 50))
-            cur.execute(sql, params)
-            rows = cur.fetchall()
-        conn.close()
-        for r in rows:
-            for k, v in r.items():
-                if hasattr(v, "isoformat"):
-                    r[k] = v.isoformat()
-        return {"count": len(rows), "phone": phone, "items": rows}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+@app.post("/api/admin/process-inbox")
+async def process_inbox(background_tasks: BackgroundTasks):
+    """inbox/ 에 있는 미처리 mp3 파일 전체를 백그라운드에서 처리."""
+    files = list(INBOX_DIR.glob("*.mp3"))
+    queued = []
+    skipped = []
+    for f in files:
+        if is_already_processed(f.name):
+            skipped.append(f.name)
+        else:
+            background_tasks.add_task(process_recording, f)
+            queued.append(f.name)
+    return {"queued": len(queued), "skipped": len(skipped), "files": queued}
 
 
 @app.get("/health")

@@ -3,6 +3,7 @@ package com.recallai.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.recallai.service.HotelCacheService;
 import com.recallai.service.IndexFaqService;
+import com.recallai.service.PhoneLookupService;
 import com.recallai.service.RagService;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -112,16 +113,32 @@ public class RagController {
         return result;
     }
 
-    /** HyDE 하이브리드 템플릿 적재 (inquiry_templated 컬렉션). */
+    /** HyDE 하이브리드 템플릿 적재 (inquiry_templated 컬렉션). limit 파라미터로 건수 제한 가능. */
     @PostMapping("/index/templated")
-    public Map<String, Object> indexTemplated() {
+    public Map<String, Object> indexTemplated(@RequestParam(defaultValue = "0") int limit) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String msg = ragService.indexAllTemplated();
+            String msg = ragService.indexAllTemplated(limit);
             result.put("success", true);
             result.put("message", msg);
         } catch (Exception e) {
             log.error("템플릿 적재 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /** Gemini Flash로 템플릿화 → inquiry_templated_gemini 컬렉션 적재. limit으로 건수 제한. */
+    @PostMapping("/index/templated/gemini")
+    public Map<String, Object> indexTemplatedGemini(@RequestParam(defaultValue = "0") int limit) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String msg = ragService.indexAllTemplatedGemini(limit);
+            result.put("success", true);
+            result.put("message", msg);
+        } catch (Exception e) {
+            log.error("Gemini 템플릿 적재 실패", e);
             result.put("success", false);
             result.put("message", e.getMessage());
         }
@@ -280,6 +297,54 @@ public class RagController {
             result.put("message", e.getMessage());
         }
         return result;
+    }
+
+    @Autowired
+    private PhoneLookupService phoneLookupService;
+
+    /**
+     * 신규 호텔 추가 — PMS 통화업무등록 시 hotels.json에 없는 호텔 자동 등록.
+     * body: { propCd, propShrtNm, propFullNm(선택), cmpxCd(선택), cmpxNm(선택), cmpxReprTel(선택) }
+     */
+    @PostMapping("/hotels/add")
+    public Map<String, Object> addHotel(@RequestBody Map<String, Object> body) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            boolean added = hotelCacheService.addHotelIfAbsent(
+                str(body, "propCd"), str(body, "propShrtNm"), str(body, "propFullNm"),
+                str(body, "cmpxCd"),  str(body, "cmpxNm"),   str(body, "cmpxReprTel"));
+            result.put("success", true);
+            result.put("added", added);
+        } catch (Exception e) {
+            log.error("호텔 추가 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * 전화번호 → propCd 매핑 추가 — PMS 통화업무등록 시 phone_lookup.json에 없는 번호 자동 등록.
+     * body: { phoneNo, propCd }
+     */
+    @PostMapping("/phone-lookup/add")
+    public Map<String, Object> addPhoneLookup(@RequestBody Map<String, Object> body) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            boolean added = phoneLookupService.addIfAbsent(str(body, "phoneNo"), str(body, "propCd"));
+            result.put("success", true);
+            result.put("added", added);
+        } catch (Exception e) {
+            log.error("phone_lookup 추가 실패", e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    private String str(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        return v != null ? v.toString() : null;
     }
 
     /** 호텔 정보 캐시 새로고침 (DB 재조회 + hotels.json 재저장) */

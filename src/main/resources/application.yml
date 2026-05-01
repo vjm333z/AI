@@ -34,8 +34,9 @@ ollama:
 # Qdrant 설정
 qdrant:
   url: ${QDRANT_URL:http://localhost:6333}
-  collection: inquiry                 # default: 원본 REPORT 임베딩
-  collection-templated: inquiry_templated   # HyDE 하이브리드 임베딩 (A/B 비교)
+  collection: inquiry                               # default: 원본 REPORT 임베딩
+  collection-templated: inquiry_templated           # HyDE (Groq)
+  collection-templated-gemini: inquiry_templated_gemini  # HyDE (Gemini)
   timeout-ms: 5000
 
 # RAG 검색 파이프라인 설정
@@ -45,24 +46,32 @@ rag:
     provider: groq         # HyDE 적재에 사용할 LLM provider. 옵션: groq (구현됨) / claude / gemini / openai (확장 가능)
   search:
     top-k: 10              # Qdrant에서 꺼낼 후보 수 (reranker 대비 넉넉히)
-    final-top-k: 3         # 최종 LLM에 넘길 문서 수
+    final-top-k: 4         # 최종 LLM에 넘길 문서 수
     score-threshold: 0.65  # Qdrant cosine 유사도 하한 (bge-m3 기준 0.65+가 "관련 있음")
-    faq-score-threshold: 0.80  # FAQ 전용 하한 — FAQ는 정확도 중요하므로 더 높게
+    faq-score-threshold: 0.60  # FAQ 전용 하한
   reranker:
     enabled: true          # Python FastAPI reranker 서비스 기동 완료 시 true
     url: ${RERANKER_URL:http://localhost:8000}
-    timeout-ms: 5000
+    timeout-ms: 20000
     min-score: 0.6         # rerank_score 컷 — 0.5 근처는 "무관" 신호. 이 아래면 사례에서 제외
   dedup:
     enabled: true              # MMR 기반 다양성 재정렬 — Top 1은 그대로, 나머지만 재선택
     jaccard-threshold: 0.7     # 이 이상이면 "유사 중복"으로 간주 (0.7 = 70% 토큰 겹침)
     lambda: 0.7                # 관련성 : 다양성 가중치. 0.7 = 관련성 70% / 다양성 30%
+  llm:
+    provider: openai       # RAG 답변 생성 LLM: openai | gemini | groq (groq는 폴백으로 항상 유지)
   query-rewrite:
     enabled: true          # true로 켜면 Groq로 검색 전 질의 확장
     timeout-ms: 3000
   scheduler:
     enabled: false         # 사외 작업 중: 03:00 자동 증분 적재 OFF (회사 복귀 시 true)
     cron: "0 0 3 * * *"
+
+# Gemini API 설정
+gemini:
+  api-key: ${GEMINI_API_KEY}
+  model: gemini-2.5-flash
+  timeout-ms: 60000
 
 # Claude API 설정
 claude:
@@ -73,6 +82,12 @@ groq:
   api-key: ${GROQ_API_KEY}
   model: llama-3.3-70b-versatile
   url: https://api.groq.com/openai/v1/chat/completions
+  timeout-ms: 30000
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  model: gpt-4o-mini
+  url: https://api.openai.com/v1/chat/completions
   timeout-ms: 30000
 
 # 로컬 recallai DB (CALL_QUEUE) — 나중에 PMS DB로 이전 시 이 값만 교체

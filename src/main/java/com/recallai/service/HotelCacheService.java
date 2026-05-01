@@ -39,10 +39,25 @@ public class HotelCacheService {
     @PostConstruct
     public void init() {
         try {
-            refresh();
+            loadFromFile();
         } catch (Exception e) {
-            log.warn("호텔 정보 초기 로드 실패 (DB 미기동 가능성): {}", e.getMessage());
+            log.warn("호텔 정보 파일 로드 실패: {}", e.getMessage());
         }
+    }
+
+    /** hotels.json 파일에서 인메모리 캐시 로드. DB 조회 없음. */
+    private void loadFromFile() throws Exception {
+        Path path = Paths.get(dataDir, "hotels.json");
+        if (!path.toFile().exists()) {
+            log.info("hotels.json 없음 — 빈 캐시로 시작");
+            return;
+        }
+        List<HotelDto> list = objectMapper.readValue(path.toFile(),
+                new com.fasterxml.jackson.core.type.TypeReference<List<HotelDto>>() {});
+        Map<String, HotelDto> map = new HashMap<>();
+        for (HotelDto h : list) map.put(h.getPropCd(), h);
+        this.hotelMap = map;
+        log.info("hotels.json 로드 완료: {}개 property", hotelMap.size());
     }
 
     /** DB 재조회 후 캐시 + hotels.json 갱신. 수동 새로고침 엔드포인트에서도 호출. */
@@ -131,6 +146,42 @@ public class HotelCacheService {
 
     public Collection<HotelDto> getAllHotels() {
         return hotelMap.values();
+    }
+
+    /**
+     * propCd가 hotels.json에 없으면 새 호텔 추가.
+     * PMS 통화업무등록 시 신규 호텔 자동 등록용.
+     * @return true: 추가됨, false: 이미 존재
+     */
+    public boolean addHotelIfAbsent(String propCd, String propShrtNm, String propFullNm,
+                                    String cmpxCd, String cmpxNm, String cmpxReprTel) throws Exception {
+        if (propCd == null || propCd.isBlank()) return false;
+        if (hotelMap.containsKey(propCd)) {
+            log.debug("hotels.json 이미 존재: propCd={}", propCd);
+            return false;
+        }
+
+        HotelDto hotel = new HotelDto();
+        hotel.setPropCd(propCd);
+        hotel.setPropShrtNm(propShrtNm);
+        hotel.setPropFullNm(propFullNm != null ? propFullNm : propShrtNm);
+        hotel.setAliases(new ArrayList<>());
+        hotel.setComplexes(new ArrayList<>());
+
+        if (cmpxCd != null && !cmpxCd.isBlank()) {
+            ComplexDto complex = new ComplexDto();
+            complex.setPropCd(propCd);
+            complex.setCmpxCd(cmpxCd);
+            complex.setCmpxNm(cmpxNm);
+            complex.setCmpxReprTel(cmpxReprTel);
+            complex.setMobileNos(new ArrayList<>());
+            hotel.getComplexes().add(complex);
+        }
+
+        hotelMap.put(propCd, hotel);
+        saveToFile();
+        log.info("hotels.json 호텔 추가: propCd={}, name={}", propCd, propShrtNm);
+        return true;
     }
 
     private void saveToFile() throws Exception {

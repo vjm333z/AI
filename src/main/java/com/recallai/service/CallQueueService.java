@@ -127,6 +127,31 @@ public class CallQueueService {
         jdbc.update("UPDATE CALL_QUEUE SET status='SKIPPED' WHERE call_id=?", callId);
     }
 
+    /** PAGE_SAVE 완료 후 큐 상태만 REGISTERED로 갱신 (KOK_CALL_MNTR INSERT는 PMS에서 이미 처리) */
+    public void register(Long callId) {
+        jdbc.update("UPDATE CALL_QUEUE SET status='REGISTERED' WHERE call_id=?", callId);
+    }
+
+    /** 동일 발신/수신 번호 이전 통화 이력 */
+    public List<CallQueueDto> callerHistory(String phone, Long excludeId, int limit) {
+        int lim = Math.min(limit, 50);
+        String base =
+            "SELECT call_id, audio_file, caller_no, receiver_no, call_dt, " +
+            "prop_cd, cmpx_cd, call_duration, stt_raw, " +
+            "LEFT(stt_report, 300) AS stt_report, stt_feedback, stt_summary, " +
+            "caller_nm, contact_no, category, resolve_status, status, " +
+            "linked_seq_no, parent_call_id, " +
+            "DATE_FORMAT(created_dt,'%Y-%m-%d %H:%i:%s') AS created_dt, " +
+            "DATE_FORMAT(updated_dt,'%Y-%m-%d %H:%i:%s') AS updated_dt " +
+            "FROM CALL_QUEUE WHERE (caller_no = ? OR receiver_no = ?)";
+        if (excludeId != null) {
+            return jdbc.query(base + " AND call_id != ? ORDER BY call_dt DESC LIMIT ?",
+                CallQueueDto.ROW_MAPPER, phone, phone, excludeId, lim);
+        }
+        return jdbc.query(base + " ORDER BY call_dt DESC LIMIT ?",
+            CallQueueDto.ROW_MAPPER, phone, phone, lim);
+    }
+
     private String buildTitle(CallQueueDto q) {
         if (q.getSttSummary() != null && !q.getSttSummary().isEmpty()) {
             String s = q.getSttSummary().split("\n")[0].trim();

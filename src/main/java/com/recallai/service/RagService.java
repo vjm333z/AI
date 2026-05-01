@@ -46,6 +46,15 @@ public class RagService {
     private GroqService groqService;
 
     @Autowired
+    private GeminiTemplatizeService geminiService;
+
+    @Autowired
+    private OpenAiService openAiService;
+
+    @Value("${rag.llm.provider:groq}")
+    private String llmProvider;
+
+    @Autowired
     private RerankerService rerankerService;
 
     @Autowired
@@ -296,14 +305,24 @@ public class RagService {
         return svc;
     }
 
-    public String indexAllTemplated() throws Exception {
+    public String indexAllTemplated() throws Exception { return indexAllTemplated(0); }
+    public String indexAllTemplated(int limit) throws Exception {
+        return indexAllTemplatedWith(templatizeProvider, qdrantService.getTemplatedCollection(), limit);
+    }
+    public String indexAllTemplatedGemini(int limit) throws Exception {
+        return indexAllTemplatedWith("gemini", qdrantService.getTemplatedGeminiCollection(), limit);
+    }
+
+    public String indexAllTemplatedWith(String provider, String collectionName, int limit) throws Exception {
         if (!indexing.compareAndSet(false, true)) {
             log.warn("indexAllTemplated 호출됐지만 이미 다른 적재 작업이 진행 중");
             return "이미 적재 작업이 진행 중입니다";
         }
         try {
-            TemplatizeService templatizer = resolveTemplatizer();
-            String collectionName = qdrantService.getTemplatedCollection();
+            TemplatizeService templatizer = templatizers.get(provider);
+            if (templatizer == null) {
+                throw new IllegalStateException("Unknown templatize provider='" + provider + "'. 사용 가능: " + templatizers.keySet());
+            }
             // 이미 적재된 seq_no는 스킵 (중복 LLM 호출 방지 — 토큰 절약)
             Set<Integer> existingSeqs = qdrantService.collectSeqNos(collectionName);
             log.info("Templated 시작: provider={}, collection={}, 기존 {}건 skip 대상",
@@ -335,6 +354,7 @@ public class RagService {
                                 consecutiveFails, ok, list.size() - existingSeqs.size());
                         break;
                     }
+                    try { Thread.sleep(4000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
                     continue;
                 }
                 consecutiveFails = 0;  // 성공 한 번 나오면 카운터 초기화
@@ -352,8 +372,11 @@ public class RagService {
                     List<Double> vector = ollamaService.embed(embText);
                     qdrantService.upsertTo(collectionName, dto.getSeqNo(), vector, dto, hyde);
                     ok++;
-                    // 성공 시 실패 장부에서 제거 (재시도 성공 케이스)
                     failureTracker.removeSuccessful(Collections.singleton(dto.getSeqNo()));
+                    if (limit > 0 && ok >= limit) {
+                        log.info("Templated limit={} 도달, 조기 종료", limit);
+                        break;
+                    }
                     if (ok % 50 == 0) {
                         log.info("Templated [{}/{}] seq_no={} (LLM실패 {}, Upsert실패 {})",
                                 ok, list.size(), dto.getSeqNo(), failLlm, failUpsert);
@@ -363,8 +386,8 @@ public class RagService {
                     log.warn("Templated upsert 실패 seq_no={}, cause={}", dto.getSeqNo(), e.getMessage());
                     failureTracker.record(dto.getSeqNo(), "templated: " + e.getMessage());
                 }
-                // Groq rate limit 여유 (무료 tier 기준): 호출 사이 50ms 대기
-                try { Thread.sleep(50); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+                // Gemini 2.5 Flash 무료 tier: 5 RPM → 12초 간격
+                try { Thread.sleep(12000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             }
 
             log.info("Templated Index 완료: 성공={}, LLM실패={}, Upsert실패={}, 빈본문={}, 기존스킵={}",
@@ -512,9 +535,27 @@ public class RagService {
         // 5. (옵션) Reranker + MMR
         List<Map<String, Object>> finalCases = rankAndDiversify(question, filteredCases);
 
-        // 6. Groq LLM으로 답변 생성 — 원본 질문 전달 (확장 쿼리 아님)
-        // finalCases가 비어있으면 groqService 내부에서 LLM 호출 없이 기본 메시지 반환
-        String answer = groqService.ask(question, finalCases);
+        // 6. LLM 답변 생성 — provider 설정에 따라 분기, 실패 시 Groq 폴백
+        String answer;
+        if ("openai".equalsIgnoreCase(llmProvider)) {
+            try {
+                answer = openAiService.ask(question, finalCases);
+                log.info("OpenAI 답변 생성 완료");
+            } catch (Exception e) {
+                log.warn("OpenAI 답변 실패, Groq 폴백: {}", e.getMessage());
+                answer = groqService.ask(question, finalCases);
+            }
+        } else if ("gemini".equalsIgnoreCase(llmProvider)) {
+            try {
+                answer = geminiService.ask(question, finalCases);
+                log.info("Gemini 답변 생성 완료");
+            } catch (Exception e) {
+                log.warn("Gemini 답변 실패, Groq 폴백: {}", e.getMessage());
+                answer = groqService.ask(question, finalCases);
+            }
+        } else {
+            answer = groqService.ask(question, finalCases);
+        }
 
         // 7. 응답 구성
         Map<String, Object> response = new LinkedHashMap<>();
@@ -524,11 +565,10 @@ public class RagService {
         return response;
     }
 
-    /** "templated" → inquiry_templated 컬렉션, 그 외 → default 컬렉션 */
+    /** "templated" → inquiry_templated, "templated_gemini" → inquiry_templated_gemini, 그 외 → default */
     private String resolveCollection(String mode) {
-        if ("templated".equalsIgnoreCase(mode)) {
-            return qdrantService.getTemplatedCollection();
-        }
+        if ("templated".equalsIgnoreCase(mode)) return qdrantService.getTemplatedCollection();
+        if ("templated_gemini".equalsIgnoreCase(mode)) return qdrantService.getTemplatedGeminiCollection();
         return qdrantService.getDefaultCollection();
     }
 

@@ -50,12 +50,20 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       GROQ_API_KEY: ${GROQ_API_KEY}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      RAG_RERANKER_MIN_SCORE: "0.6"
+      RAG_QUERY_REWRITE_ENABLED: "true"
+      LOCAL_DB_URL: jdbc:mariadb://mariadb-local:3306/recallai
+      LOCAL_DB_USERNAME: recallai
+      LOCAL_DB_PASSWORD: recallai
     volumes:
       - app_data:/app/data
     depends_on:
       - qdrant
       - ollama
       - reranker
+      - mariadb-local
     restart: unless-stopped
 
   stt:
@@ -64,18 +72,21 @@ services:
     ports:
       - "8001:8001"
     environment:
-      GROQ_API_KEY: ${GROQ_API_KEY}
-      DB_HOST: mariadb-local
-      DB_PORT: 3306
-      DB_USER: recallai
-      DB_PASSWORD: recallai
-      DB_NAME: recallai
+      PYTHONUNBUFFERED: "1"
+      GROQ_STT_API_KEY: ${GROQ_STT_API_KEY:-${GROQ_API_KEY}}
+      GROQ_LLM_API_KEY: ${GROQ_LLM_API_KEY:-${GROQ_API_KEY}}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      DB_HOST: ${STT_DB_HOST:-211.34.228.191}
+      DB_PORT: ${STT_DB_PORT:-3336}
+      DB_USER: ${STT_DB_USER:-peh0322}
+      DB_PASSWORD: ${STT_DB_PASSWORD:-dmsWkd0819!@#}
+      DB_NAME: ${STT_DB_NAME:-PMS}
     volumes:
       - stt_inbox:/app/inbox
       - stt_recordings:/app/recordings
       - stt_results:/app/results
-    depends_on:
-      - mariadb-local
     restart: unless-stopped
 
   mariadb-local:

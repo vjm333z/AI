@@ -118,4 +118,44 @@ public class CallQueueController {
         }
         return result;
     }
+
+    /**
+     * POST /api/queue/{callId}/register
+     * PAGE_SAVE 완료 후 호출 — KOK_CALL_MNTR INSERT는 PMS에서 이미 처리했으므로
+     * 큐 상태만 REGISTERED로 갱신.
+     */
+    @PostMapping("/{callId}/register")
+    public Map<String, Object> register(@PathVariable Long callId) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            callQueueService.register(callId);
+            result.put("success", true);
+        } catch (Exception e) {
+            log.error("CALL_QUEUE register 실패 call_id={}", callId, e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /** GET /api/queue/caller-history?phone=xxx&excludeId=1&limit=10 */
+    @GetMapping("/caller-history")
+    public Map<String, Object> callerHistory(
+            @RequestParam String phone,
+            @RequestParam(required = false) Long excludeId,
+            @RequestParam(defaultValue = "10") int limit) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            result.put("success", true);
+            result.put("phone", phone);
+            var items = callQueueService.callerHistory(phone, excludeId, limit);
+            result.put("count", items.size());
+            result.put("items", items);
+        } catch (Exception e) {
+            log.error("caller-history 조회 실패 phone={}", phone, e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
 }

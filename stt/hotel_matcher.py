@@ -43,24 +43,26 @@ def fix_hotel_names(text: str, alias_pairs: list) -> str:
     return text
 
 
-def find_hotel_from_text(text: str, hotels: list) -> dict:
-    """텍스트에서 호텔 매칭: 정확 → 부분 포함 → fuzzy (threshold 0.65)."""
+def find_hotel_from_text(text: str, hotels: list) -> tuple:
+    """텍스트에서 호텔 매칭: 정확 → 부분 포함 → fuzzy (threshold 0.65).
+    반환: (hotel, alias_candidate) — alias_candidate는 fuzzy 매칭 시 후보 문자열, 나머지는 None.
+    """
     if not text or not hotels:
-        return None
+        return None, None
 
     from difflib import SequenceMatcher
 
     for h in hotels:
         for name in [h.get("propShrtNm", ""), h.get("propFullNm", "")]:
             if name and name in text:
-                return h
+                return h, None
 
     for h in hotels:
         for alias in h.get("aliases", []):
             if alias and alias in text:
-                return h
+                return h, None
 
-    best, best_score = None, 0.65
+    best, best_score, best_window = None, 0.65, None
     for h in hotels:
         name = h.get("propShrtNm", "")
         if not name:
@@ -72,7 +74,34 @@ def find_hotel_from_text(text: str, hotels: list) -> dict:
             if score > best_score:
                 best_score = score
                 best = h
-    return best
+                best_window = window.strip()
+    return best, best_window
+
+
+def add_alias(json_path: str, prop_cd: str, alias: str) -> bool:
+    """hotels.json에 alias 추가. 이미 있으면 스킵. 반환: True=추가됨."""
+    if not json_path or not prop_cd or not alias or not alias.strip():
+        return False
+    alias = alias.strip()
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            hotels = json.load(f)
+        changed = False
+        for h in hotels:
+            if h.get("propCd") == prop_cd:
+                existing = h.setdefault("aliases", [])
+                if alias not in existing:
+                    existing.append(alias)
+                    changed = True
+                break
+        if changed:
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(hotels, f, ensure_ascii=False, indent=2)
+            print(f"[호텔] alias 추가: {prop_cd} ← '{alias}'")
+        return changed
+    except Exception as e:
+        print(f"[호텔] alias 저장 실패: {e}")
+        return False
 
 
 def find_hotel_by_call_no(receiver_no: str, hotels: list) -> tuple:

@@ -1,5 +1,6 @@
 package com.recallai.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.recallai.dto.KokCallMntrDto;
 import com.recallai.repository.KokCallMntrMapper;
@@ -7,13 +8,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -43,21 +44,9 @@ public class PhoneLookupService {
 
     @PostConstruct
     public void init() {
-        try {
-            refresh();
-        } catch (Exception e) {
-            log.warn("phone_lookup 초기 생성 실패 (DB 미기동 가능성): {}", e.getMessage());
-        }
-    }
-
-    /** 매일 새벽 2시 자동 갱신 */
-    @Scheduled(cron = "0 0 2 * * *")
-    public void scheduled() {
-        try {
-            refresh();
-        } catch (Exception e) {
-            log.warn("phone_lookup 갱신 실패: {}", e.getMessage());
-        }
+        Path path = Paths.get(dataDir, "phone_lookup.json");
+        Map<String, String> loaded = loadCurrent(path);
+        log.info("phone_lookup.json 로드 완료: {}개 번호", loaded.size());
     }
 
     public Map<String, String> refresh() throws Exception {
@@ -83,5 +72,40 @@ public class PhoneLookupService {
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), lookup);
         log.info("phone_lookup.json 저장 완료: {}개 번호 → {}", lookup.size(), path.toAbsolutePath());
         return lookup;
+    }
+
+    /**
+     * 전화번호 → propCd 매핑이 없으면 phone_lookup.json에 추가.
+     * 이미 있으면 스킵.
+     * @return true: 추가됨, false: 이미 존재
+     */
+    public boolean addIfAbsent(String phoneNo, String propCd) throws Exception {
+        if (phoneNo == null || phoneNo.isBlank() || propCd == null || propCd.isBlank()) return false;
+
+        String digits = phoneNo.replaceAll("[^0-9]", "");
+        if (digits.length() < 9) return false;
+
+        Path path = Paths.get(dataDir, "phone_lookup.json");
+        Map<String, String> map = loadCurrent(path);
+
+        if (map.containsKey(digits)) {
+            log.debug("phone_lookup 이미 존재: {} → {}", digits, map.get(digits));
+            return false;
+        }
+
+        map.put(digits, propCd);
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), map);
+        log.info("phone_lookup 추가: {} → {}", digits, propCd);
+        return true;
+    }
+
+    private Map<String, String> loadCurrent(Path path) {
+        if (!path.toFile().exists()) return new LinkedHashMap<>();
+        try {
+            return objectMapper.readValue(path.toFile(), new TypeReference<LinkedHashMap<String, String>>() {});
+        } catch (Exception e) {
+            log.warn("phone_lookup.json 읽기 실패 (빈 맵으로 시작): {}", e.getMessage());
+            return new LinkedHashMap<>();
+        }
     }
 }

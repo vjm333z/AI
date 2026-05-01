@@ -43,6 +43,14 @@ public class RerankerService {
                 .setSocketTimeout(timeoutMs)
                 .build();
         this.httpClient = HttpClients.custom().setDefaultRequestConfig(config).build();
+        // 모델 콜드 스타트 방지 — 빈 요청으로 미리 로드
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000); // 컨테이너 기동 대기
+                rerank("warmup", List.of(), 1);
+                log.info("[Reranker] 워밍업 완료");
+            } catch (Exception ignored) {}
+        }, "reranker-warmup").start();
     }
 
     @PreDestroy

@@ -30,9 +30,9 @@ from corrections import fix_company_name, WHISPER_INITIAL_PROMPT, DAOL_RECEIVER_
 from hotel_matcher import (
     load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
     find_hotel_by_call_no, find_hotel_by_phone_lookup,
-    find_hotel_from_text, find_cmpx_from_text,
+    find_hotel_from_text, find_cmpx_from_text, add_alias,
 )
-from db_utils import DB_DEFAULT, lookup_caller_history, save_to_db
+from db_utils import DB_DEFAULT, lookup_caller_history, save_to_aia
 
 # Windows 한글 콘솔(cp949)에서 유니코드 출력 깨짐 방지
 if sys.platform == "win32":
@@ -51,14 +51,25 @@ if _env_file.exists():
             _k, _v = _line.split("=", 1)
             os.environ[_k.strip()] = _v.strip()
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    sys.exit("❌ GROQ_API_KEY 없음. stt/.env 파일에 GROQ_API_KEY=gsk_... 추가하세요.")
+GROQ_STT_API_KEY = os.environ.get("GROQ_STT_API_KEY") or os.environ.get("GROQ_API_KEY")
+GROQ_LLM_API_KEY = os.environ.get("GROQ_LLM_API_KEY") or os.environ.get("GROQ_API_KEY")
+if not GROQ_STT_API_KEY:
+    sys.exit("❌ GROQ_STT_API_KEY 없음. stt/.env 파일에 추가하세요.")
+
+GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
+OPENAI_API_KEY  = os.environ.get("OPENAI_API_KEY", "")
+LLM_PROVIDER    = os.environ.get("LLM_PROVIDER", "openai")  # openai | gemini | groq
 
 GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_MODEL     = "llama-3.3-70b-versatile"
 GROQ_STT_MODEL = "whisper-large-v3"
+
+OPENAI_URL   = "https://api.openai.com/v1/chat/completions"
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
+GEMINI_LLM_MODEL = os.environ.get("GEMINI_LLM_MODEL", "gemini-2.5-flash")
+GEMINI_LLM_URL   = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_LLM_MODEL}:generateContent"
 
 
 # ────────────────────────────────────────────────────────────────
@@ -123,13 +134,27 @@ def transcribe_groq(audio_path: str) -> dict:
         "response_format": "verbose_json",
         "prompt": WHISPER_INITIAL_PROMPT,
     }
-    resp = _requests.post(
-        GROQ_STT_URL,
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-        files={"file": (os.path.basename(audio_path), file_data, "audio/mpeg")},
-        data=fields,
-        timeout=120,
-    )
+    for attempt in range(5):
+        resp = _requests.post(
+            GROQ_STT_URL,
+            headers={"Authorization": f"Bearer {GROQ_STT_API_KEY}"},
+            files={"file": (os.path.basename(audio_path), file_data, "audio/mpeg")},
+            data=fields,
+            timeout=120,
+        )
+        if resp.status_code == 429:
+            wait = 60
+            try:
+                import re as _re
+                m = _re.search(r"try again in ([0-9.]+)s", resp.text)
+                if m:
+                    wait = int(float(m.group(1))) + 2
+            except Exception:
+                pass
+            print(f"[STT-Groq] 429 rate limit, {wait}초 대기 후 재시도 ({attempt+1}/5)")
+            time.sleep(wait)
+            continue
+        break
     if not resp.ok:
         raise RuntimeError(f"Groq STT 실패 HTTP {resp.status_code}: {resp.text[:300]}")
     res = resp.json()
@@ -216,24 +241,30 @@ SUMMARIZE_SYSTEM_PROMPT = """너는 호텔 PMS 상담 통화 모노 녹취록을
 
 [출력 — 순수 JSON. 설명·마크다운 금지]
 {
-  "report": "⭐ KOK_CALL_MNTR.REPORT에 저장될 값. 아래 형식을 정확히 따를 것 (줄바꿈 포함):\n문의자 : [발신자의 담당자명 또는 부서명. 호텔명은 절대 쓰지 말 것 (호텔은 별도 관리). 예: '프런트 담당자', '예약실', '김철수 대리'. 파악 안 되면 '미확인']\n연락처: [통화에서 언급된 전화번호. 없으면 '미확인'. 개인 핸드폰은 010-****-NNNN 형태로 마스킹]\n문의내역: [발신자 문의 내용을 사실 위주 2~4줄 서술. 상황·증상·요청 포함. 상담원 답변 내용 섞지 마. 호실번호·예약번호 등 PII 제거]",
+  "report": "⭐ KOK_CALL_MNTR.REPORT에 저장될 값. 아래 형식을 정확히 따를 것 (줄바꿈 포함):\n문의자 : [발신자의 담당자명 또는 부서명. 호텔명은 절대 쓰지 말 것 (호텔은 별도 관리). 예: '프런트 담당자', '예약실', '김철수 대리'. 파악 안 되면 '미확인']\n연락처: [통화에서 언급된 전화번호. 없으면 '미확인']\n문의내역: [발신자 문의 내용을 사실 위주 2~4줄 서술. 상황·증상·요청 포함. 상담원 답변 내용 섞지 마. 호실번호·예약번호 등 구체 정보 그대로 포함]",
   "feedback": "⭐ 상담원이 제공한 답변·조치·후속안내를 통합해 KOK_CALL_MNTR.FEEDBACK 컬럼에 바로 넣을 수 있는 서술형 2~4줄. 예: '세팅값 확인 결과 일부 설정 누락. 수정 후 재전송 안내. 추후 공지사항으로 안내 예정.'",
-  "speaker_A": "역할 추정 (예: '다올 비전 상담원 (수신측)')",
-  "speaker_B": "역할 추정 (예: '홈즈스테이 예약실 직원 (발신측)')",
-  "dialogue": [
-    {"speaker": "A", "start": 0.0, "text": "정리된 발화"},
-    {"speaker": "B", "start": 3.5, "text": "..."}
-  ],
-  "inquirer": "A" or "B",
-  "responder": "A" or "B",
+  "system_cd": "접수시스템 코드. 아래 중 하나만 출력(코드만): PMS(프런트·예약·정산·객실 등 PMS 관련) / KIOSK(키오스크 장비·오류·사용법) / POS(POS 단말·결제) / CMS(CMS 관련) / DBE(부킹엔진·OTA) / ETC(기타)",
+  "system_con": "접수내용 코드. system_cd 먼저 판단한 뒤 아래 표에서 가장 잘 맞는 코드 하나만 출력(숫자만).\n[PMS] 1(예약) 2(프런트) 3(정산) 4(객실정비) 5(일마감) 8(업장관리) 9(메뉴관리) 10(예약관리) 27(정보관리) 28(상품/판매관리) 29(예약확인) 49(사용처리관련) 50(매출관련) 51(객실관리관련)\n[KIOSK] 24(에러/조회) 26(사용법)\n[DBE] 25(OTA예약)\n[ETC] 26(사용법)",
+  "system_tp": "접수유형 코드. 아래 중 하나만 출력(코드만): 01(신규기능 요청) / 02(시스템장애·오류) / 03(단순문의·사용법) / 04(칭찬) / 05(불만)",
+  "urgency_cd": "긴급도 코드. 아래 중 하나만 출력(알파벳만): A(심각: 전체 사용불가·데이터손실·즉시처리필요) / B(중요: 일부기능불가·업무지연) / C(보통: 불편하지만업무가능·일반장애) / D(낮음: 단순문의·설정변경·사용법질문)",
+  "status": "해결됨 / 처리중 / 추가조사 필요 / 미확인 중 하나",
+  "category": "키오스크 / 객실키 / 결제·카드 / 체크인 / PMS기능 / 부킹엔진 / 소모품·시재 / 기타 중 하나",
   "question": "발신자의 핵심 문의 (50자 이내, 의문문)",
   "context": "질문 배경·상황 (1-2줄)",
   "answer_given": "상담원이 제공한 답변·조치 (없으면 '답변 보류')",
   "actions_taken": ["실제 취해진 조치 리스트"],
   "follow_up": "이후 처리 예정 사항 (없으면 '없음')",
-  "status": "해결됨 / 처리중 / 추가조사 필요 / 미확인 중 하나",
-  "category": "키오스크 / 객실키 / 결제·카드 / 체크인 / PMS기능 / 부킹엔진 / 소모품·시재 / 기타 중 하나",
-  "summary": "통화 전체를 상세히 서술. 발신자 문의 배경·증상·요청 → 상담원 확인·조치 → 결론·후속사항 순서로 5~10줄 자세한 한국어 서술형 요약. 핵심 조치와 미결 사항은 반드시 포함."
+  "hotel_nm": "통화에서 언급된 발신 호텔·업장명. STT 텍스트나 화자 발화에서 들린 그대로. 예: '홈즈스테이', '가산 그래비티', '수원 노보텔'. 전혀 알 수 없으면 null",
+  "caller_nm": "문의자명+직함. 통화에서 파악된 이름·직책 조합. 예: '김정자 지배인', '박철수 대리', '예약실 담당자'. 이름도 직함도 전혀 모를 때만 '미확인'",
+  "speaker_A": "역할 추정 (예: '다올 비전 상담원 (수신측)')",
+  "speaker_B": "역할 추정 (예: '홈즈스테이 예약실 직원 (발신측)')",
+  "inquirer": "A or B",
+  "responder": "A or B",
+  "summary": "통화 전체를 상세히 서술. 발신자 문의 배경·증상·요청 → 상담원 확인·조치 → 결론·후속사항 순서로 5~10줄 자세한 한국어 서술형 요약. 핵심 조치와 미결 사항은 반드시 포함.",
+  "dialogue": [
+    {"speaker": "A", "start": 0.0, "text": "정리된 발화"},
+    {"speaker": "B", "start": 3.5, "text": "..."}
+  ]
 }
 
 [report·feedback 필드 지침]
@@ -247,15 +278,14 @@ SUMMARIZE_SYSTEM_PROMPT = """너는 호텔 PMS 상담 통화 모노 녹취록을
 - 두 필드만 있어도 **원본 상담 기록을 재구성**할 수 있어야 함 (나머지 필드는 분석·검색용).
 
 [규칙]
-1. **dialogue는 대화 흐름을 보여주는 핵심 턴 5~15개로 축약**. 입력 세그먼트가 50개든 100개든 전부 담지 마. 긴 발화는 1~2줄로 요약해서 화자별 핵심 의도만 남기고, 단순 맞장구("네네")는 생략.
-   ⚠️ **dialogue가 너무 길면 뒤 분석 필드(question/summary 등) 토큰 부족해서 잘림 — 반드시 축약.**
+1. **dialogue는 마지막 필드**. 대화 흐름을 보여주는 핵심 턴 5~15개로 축약. 입력 세그먼트가 50개든 100개든 전부 담지 마. 긴 발화는 1~2줄로 요약해서 화자별 핵심 의도만 남기고, 단순 맞장구("네네")는 생략.
 2. 화자 판별 단서:
    - 전화 건 쪽 = 인사말 뒤 곧바로 용건 꺼냄 ("홈즈스테이 예약실인데요", "저희가 뭐 여쭤볼 게 있어서")
    - 받은 쪽 = 회사명 짧게 밝힘 ("다월입니다"), 질문 주도 ("어떤 상품일까요?")
-3. **PII 제거 또는 일반화**: 구체 호실번호(410호 같은), 전화번호, 예약번호, 사람 이름. 호텔 브랜드명은 역할 추정용 한 번만 사용 후 이후엔 '해당 업장' 등으로 일반화 가능.
+3. 호실번호, 전화번호, 예약번호, 이름 등 통화에서 언급된 구체 정보는 **그대로** 기록해. 지우거나 마스킹하지 마. 호텔 브랜드명은 역할 추정용 한 번만 사용 후 이후엔 '해당 업장' 등으로 일반화 가능.
 4. STT 인식 오류 가능성 — 문맥으로 판단해 자연스럽게 정리. 단, 없는 내용은 지어내지 마.
 5. 불명확한 부분은 "미확인"으로.
-6. **question, answer_given, summary, category, status 등 모든 분석 필드는 반드시 채워**. "(미확인)"은 정말 파악 안 될 때만 사용.
+6. **system_cd, system_con, system_tp, urgency_cd, question, answer_given, summary 등 모든 분석 필드는 반드시 채워**. "(미확인)"은 정말 파악 안 될 때만 사용.
 7. question / answer_given 은 각각 **inquirer / responder 발화에 근거**해 작성."""
 
 
@@ -288,6 +318,91 @@ def _inject_caller_contact(report: str, caller_no: str, receiver_no: str = None)
     return re.sub(r"연락처\s*:[ \t]*.*", f"연락처: {contact}", report)
 
 
+def _call_gemini_llm(user_input: str, timeout: int = 60) -> dict:
+    """Gemini API로 STT 요약 JSON 반환. 실패 시 예외 발생."""
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY 없음")
+
+    url = f"{GEMINI_LLM_URL}?key={GEMINI_API_KEY}"
+    body = {
+        "system_instruction": {"parts": [{"text": SUMMARIZE_SYSTEM_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": user_input}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 4000,
+            "responseMimeType": "application/json",
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
+    }
+
+    for attempt in range(4):
+        resp = _requests.post(url, json=body, timeout=timeout)
+        if resp.status_code == 429:
+            m = re.search(r"retry in ([0-9.]+)s", resp.text)
+            wait = float(m.group(1)) + 2.0 if m else 60.0
+            print(f"[요약-Gemini] Rate limit (429) — {wait:.1f}초 후 재시도 ({attempt+1}/4)")
+            time.sleep(wait)
+            continue
+        if not resp.ok:
+            raise RuntimeError(f"Gemini HTTP {resp.status_code}: {resp.text[:300]}")
+        break
+    else:
+        raise RuntimeError("Gemini rate limit 재시도 초과")
+
+    candidates = resp.json().get("candidates", [])
+    if not candidates:
+        raise RuntimeError("Gemini 응답에 candidates 없음")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    content = None
+    for part in parts:
+        if part.get("thought"):
+            continue
+        content = part.get("text", "")
+        break
+    if not content:
+        raise RuntimeError("Gemini 응답에 text 없음")
+    return json.loads(content)
+
+
+def _call_openai_llm(user_input: str, timeout: int = 60) -> dict:
+    """OpenAI gpt-4o-mini로 STT 요약 JSON 반환. 실패 시 예외 발생."""
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY 없음")
+
+    body = {
+        "model": OPENAI_MODEL,
+        "messages": [
+            {"role": "system", "content": SUMMARIZE_SYSTEM_PROMPT},
+            {"role": "user",   "content": user_input},
+        ],
+        "max_tokens": 4000,
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+    }
+
+    for attempt in range(4):
+        resp = _requests.post(
+            OPENAI_URL,
+            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+            json=body,
+            timeout=timeout,
+        )
+        if resp.status_code == 429:
+            m = re.search(r"try again in ([\d.]+)s", resp.text)
+            wait = float(m.group(1)) + 2.0 if m else 60.0
+            print(f"[요약-OpenAI] Rate limit (429) — {wait:.1f}초 후 재시도 ({attempt+1}/4)")
+            time.sleep(wait)
+            continue
+        if not resp.ok:
+            raise RuntimeError(f"OpenAI HTTP {resp.status_code}: {resp.text[:300]}")
+        break
+    else:
+        raise RuntimeError("OpenAI rate limit 재시도 초과")
+
+    content = resp.json()["choices"][0]["message"]["content"]
+    return json.loads(content)
+
+
 def summarize(segments: list, context: dict = None, timeout: int = 60) -> dict:
     """STT 세그먼트 → 화자 분리 대화록 + 구조화 요약 JSON."""
     if not segments:
@@ -303,7 +418,7 @@ def summarize(segments: list, context: dict = None, timeout: int = 60) -> dict:
     if context:
         meta = ["[통화 메타정보 — 아래 값은 시스템이 확정한 값이므로 report 필드에 그대로 사용할 것]"]
         if context.get("hotel_name"):
-            meta.append(f"- 문의자(호텔명): {context['hotel_name']}  ← report의 '문의자' 줄에 이 값 그대로 사용")
+            meta.append(f"- 발신 호텔명 (참고용): {context['hotel_name']}  ← speaker_B 역할 파악에만 사용. report의 '문의자'에는 호텔명 쓰지 말고 담당자명·부서명으로 채울 것")
         if context.get("caller_no"):
             meta.append(f"- 연락처(발신번호): {context['caller_no']}  ← report의 '연락처' 줄에 이 값 그대로 사용")
         if context.get("receiver_no"):
@@ -317,6 +432,31 @@ def summarize(segments: list, context: dict = None, timeout: int = 60) -> dict:
     else:
         user_input = stt_text
 
+    print(f"[요약] 호출 (세그먼트 {len(segments)}개, 입력 {len(user_input)}자, provider={LLM_PROVIDER})...")
+    t0 = time.time()
+
+    # OpenAI 우선 시도
+    if LLM_PROVIDER == "openai" and OPENAI_API_KEY:
+        try:
+            result = _call_openai_llm(user_input, timeout=timeout)
+            print(f"[요약] OpenAI 완료 ({time.time()-t0:.1f}초)")
+            return result
+        except Exception as e:
+            print(f"[요약] OpenAI 실패, Groq 폴백: {e}")
+
+    # Gemini 시도
+    if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
+        try:
+            result = _call_gemini_llm(user_input, timeout=timeout)
+            print(f"[요약] Gemini 완료 ({time.time()-t0:.1f}초)")
+            return result
+        except Exception as e:
+            print(f"[요약] Gemini 실패, Groq 폴백: {e}")
+
+    # Groq 폴백
+    if not GROQ_LLM_API_KEY:
+        return {"error": "GROQ_LLM_API_KEY 없음 — Gemini도 실패했거나 설정 안 됨"}
+
     body = {
         "model": GROQ_MODEL,
         "messages": [
@@ -328,33 +468,30 @@ def summarize(segments: list, context: dict = None, timeout: int = 60) -> dict:
         "response_format": {"type": "json_object"},
     }
 
-    print(f"[요약] Groq 호출 (세그먼트 {len(segments)}개, 입력 {len(user_input)}자)...")
-    t0 = time.time()
-
     for attempt in range(4):
         try:
             resp = _requests.post(
                 GROQ_URL,
-                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                headers={"Authorization": f"Bearer {GROQ_LLM_API_KEY}"},
                 json=body,
                 timeout=timeout,
             )
             if resp.status_code == 429:
                 m = re.search(r"try again in ([\d.]+)s", resp.text)
                 wait = float(m.group(1)) + 2.0 if m else 60.0
-                print(f"[요약] Rate limit (429) — {wait:.1f}초 후 재시도 (시도 {attempt+1}/4)")
+                print(f"[요약-Groq] Rate limit (429) — {wait:.1f}초 후 재시도 (시도 {attempt+1}/4)")
                 time.sleep(wait)
                 continue
             if not resp.ok:
-                return {"error": f"HTTP {resp.status_code}: {resp.text[:500]}"}
+                return {"error": f"Groq HTTP {resp.status_code}: {resp.text[:500]}"}
             res = resp.json()
             break
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
     else:
-        return {"error": "Rate limit 재시도 초과"}
+        return {"error": "Groq rate limit 재시도 초과"}
 
-    print(f"[요약] 완료 ({time.time()-t0:.1f}초)")
+    print(f"[요약] Groq 완료 ({time.time()-t0:.1f}초)")
     content = res["choices"][0]["message"]["content"]
     try:
         return json.loads(content)
@@ -639,7 +776,7 @@ def main():
                 summary.get("report", ""),
                 stt_result.get("text", "")[:500],
             ]))
-            matched_hotel = find_hotel_from_text(search_text, hotels)
+            matched_hotel, alias_candidate = find_hotel_from_text(search_text, hotels)
             if matched_hotel:
                 prop_cd     = matched_hotel.get("propCd")
                 matched_cmpx = find_cmpx_from_text(search_text, matched_hotel)
@@ -647,6 +784,8 @@ def main():
                     cmpx_cd = matched_cmpx.get("cmpxCd")
                 print(f"[호텔] 텍스트 매칭: {matched_hotel.get('propShrtNm')} "
                       f"(prop_cd={prop_cd}, cmpx_cd={cmpx_cd})")
+                if alias_candidate and hotels_path:
+                    add_alias(hotels_path, prop_cd, alias_candidate)
 
         if matched_hotel and cmpx_cd is None:
             complexes = matched_hotel.get("complexes", [])
@@ -657,9 +796,7 @@ def main():
         if not matched_hotel:
             print("[호텔] 매칭 실패 — prop_cd=null (상담사가 UI에서 선택 필요)")
 
-        if matched_hotel and summary and "error" not in summary:
-            hotel_nm = (matched_cmpx.get("cmpxNm") if matched_cmpx else None) or matched_hotel.get("propShrtNm", "")
-            summary["report"] = _inject_hotel_name(summary.get("report", ""), hotel_nm)
+        # 호텔명은 propCd로 관리하므로 report의 '문의자' 줄에는 삽입하지 않음
 
     result = {
         "audio_file":  os.path.basename(audio_path),
@@ -677,9 +814,9 @@ def main():
     print(f"\n✅ JSON 저장: {output_path}")
 
     if args.save_db:
-        call_id = save_to_db(result, db_cfg)
+        call_id = save_to_aia(result, db_cfg)
         if call_id:
-            result["call_id"] = call_id
+            result["rec_seq_no"] = call_id
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
 
