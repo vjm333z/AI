@@ -89,10 +89,3 @@ openai:
   model: gpt-4o-mini
   url: https://api.openai.com/v1/chat/completions
   timeout-ms: 30000
-
-# 로컬 recallai DB (CALL_QUEUE) — 나중에 PMS DB로 이전 시 이 값만 교체
-local:
-  datasource:
-    url: ${LOCAL_DB_URL:jdbc:mariadb://127.0.0.1:3307/recallai}
-    username: ${LOCAL_DB_USERNAME:recallai}
-    password: ${LOCAL_DB_PASSWORD:recallai}

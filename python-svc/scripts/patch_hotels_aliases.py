@@ -4,8 +4,8 @@
 hotels.json에 aliases를 자동 생성/추가하는 1회성 유틸리티.
 
 실행:
-    python patch_hotels_aliases.py
-    python patch_hotels_aliases.py --hotels ../../hotels.json --dry-run
+    python scripts/patch_hotels_aliases.py
+    python scripts/patch_hotels_aliases.py --hotels ../data/hotels.json --dry-run
 
 동작:
   - 이미 aliases가 있는 호텔은 건드리지 않음 (기존 수동 편집 보존)
@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -47,7 +48,6 @@ JSON 배열로만 반환. 설명 없이. 원본 이름 제외. 최대 20개."""
 # Whisper가 자주 틀리는 이름, 약칭, 영어 발음 등을 수동으로 지정
 # ────────────────────────────────────────────────────────────────
 HARDCODED = {
-    # ─── 표준 변형 (공백·법인명) + 심하게 틀린 Whisper 오인식 ───────────────
     "해마호텔":             ["해마 호텔", "헤마호텔", "헤마 호텔"],
     "제주푸른호텔":         ["제주 푸른 호텔", "제주 푸른호텔", "제주 푸린호텔"],
     "㈜호텔에이치엘비":     ["호텔에이치엘비", "호텔 에이치엘비", "HLB", "에이치엘비", "에이치 엘비"],
@@ -115,15 +115,10 @@ def _rule_aliases(name: str) -> list:
     """규칙 기반 자동 alias 생성 (하드코드 보완용)."""
     candidates = set()
 
-    # 공백 제거 버전
     no_space = name.replace(" ", "")
     if no_space != name and len(no_space) > 1:
         candidates.add(no_space)
 
-    # 공백 추가 버전 (붙어있는 한글 2글자 단위로)
-    # 너무 공격적이라 skip — 하드코드로 관리
-
-    # ㅆ→ㅅ, ㅅ→ㅆ 교체 (Whisper 자주 혼동)
     subs = [
         ("써", "서"), ("씨", "시"), ("쌍", "상"), ("쎄", "세"),
         ("스태이", "스테이"), ("스테이", "스태이"),
@@ -134,14 +129,12 @@ def _rule_aliases(name: str) -> list:
         if dst in name:
             candidates.add(name.replace(dst, src))
 
-    # 법인 접두어 제거 (주식회사, (주), ㈜, 재단법인 등)
     for prefix in ["주식회사 ", "(주)", "㈜", "재단법인 ", "의료법인 "]:
         if name.startswith(prefix):
             stripped = name[len(prefix):]
             if stripped:
                 candidates.add(stripped)
 
-    # 원본 제거
     candidates.discard(name)
     return sorted(candidates)
 
@@ -150,18 +143,7 @@ def _llm_aliases(name: str, api_key: str, existing: list) -> list:
     """Groq로 Whisper 오인식 변형 생성. 실패 시 빈 리스트."""
     if not api_key:
         return []
-    body = json.dumps({
-        "model": GROQ_MODEL,
-        "messages": [
-            {"role": "system", "content": LLM_SYSTEM_PROMPT},
-            {"role": "user", "content": f"호텔 이름: {name}"},
-        ],
-        "max_tokens": 300,
-        "temperature": 0.7,
-        "response_format": {"type": "json_object"},
-    }).encode("utf-8")
 
-    # JSON object 반환이라 배열을 감싸도록 프롬프트 보완
     body = json.dumps({
         "model": GROQ_MODEL,
         "messages": [
@@ -186,10 +168,9 @@ def _llm_aliases(name: str, api_key: str, existing: list) -> list:
             content = json.loads(res["choices"][0]["message"]["content"])
             candidates = content.get("aliases", [])
             existing_set = set(existing) | {name}
-            # 일본어(히라가나 3040-309F, 가타카나 30A0-30FF) 포함 항목 제거
             return [c for c in candidates
                     if isinstance(c, str) and c and c not in existing_set
-                    and not re.search(r'[\u3040-\u30FF\u4E00-\u9FFF]', c)]
+                    and not re.search(r'[぀-ヿ一-鿿]', c)]
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 wait = 15 * (attempt + 1)
@@ -211,29 +192,25 @@ def generate_aliases(hotel: dict, api_key: str = None, target: int = 20) -> list
 
     result = list(HARDCODED.get(name, []))
 
-    # 하드코드 없으면 규칙 기반으로 보완
     if not result:
         result = _rule_aliases(name)
 
-    # propFullNm이 다르면 추가 (법인명이 아닐 때만)
     legal_prefixes = ["주식회사", "(주)", "㈜", "재단법인", "의료법인"]
     if full and full.strip() != name and not any(full.startswith(p) for p in legal_prefixes):
         clean_full = full.strip()
         if clean_full not in result and clean_full != name:
             result.append(clean_full)
 
-    # cmpxNm이 propShrtNm과 다르면 추가 (단일 complex인 경우)
     complexes = hotel.get("complexes", [])
     if len(complexes) == 1:
         cmpx_nm = complexes[0].get("cmpxNm", "").strip()
         if cmpx_nm and cmpx_nm != name and cmpx_nm not in result:
             result.append(cmpx_nm)
 
-    # LLM으로 target 개수까지 보완
     if api_key and len(result) < target:
         llm = _llm_aliases(name, api_key, result)
         result.extend(llm[:target - len(result)])
-        time.sleep(2.0)  # TPM 한도 완화 (12kTPM / ~300토큰 = 40호텔/분 → 1.5s 이상 필요)
+        time.sleep(2.0)
 
     return result
 
@@ -256,7 +233,8 @@ def main():
 
     hotels_path = args.hotels
     if not hotels_path:
-        auto = Path(__file__).parent.parent / "data" / "hotels.json"
+        # python-svc/scripts/ -> python-svc/ -> project root -> data/hotels.json
+        auto = Path(__file__).parent.parent.parent / "data" / "hotels.json"
         if auto.exists():
             hotels_path = str(auto)
     if not hotels_path or not Path(hotels_path).exists():

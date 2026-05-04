@@ -1,7 +1,8 @@
-version: "3.9"
-
 # 기억사무소 RAG — 전체 스택 (인프라 + 앱)
 # 시크릿은 .env 파일에서 로드. .env.example 참고.
+#
+# Python 서비스(reranker + STT)는 단일 컨테이너 python-svc 로 통합 (포트 8000).
+# CALL_QUEUE / mariadb-local 은 폐기됐고 STT 결과는 운영 PMS DB의 AIA_CALL_* 테이블에 저장.
 services:
   qdrant:
     image: qdrant/qdrant:v1.17.1
@@ -22,16 +23,33 @@ services:
     restart: unless-stopped
     # 최초 기동 후 별도로: docker exec -it ollama ollama pull bge-m3
 
-  reranker:
-    build: ./reranker
-    container_name: reranker
+  python-svc:
+    build: ./python-svc
+    container_name: python-svc
     ports:
-      - "8000:8000"
+      - "8000:8000"      # /rerank, /api/recording, /api/admin/*, /health
     environment:
+      PYTHONUNBUFFERED: "1"
+      # Reranker
       RERANKER_MODEL: BAAI/bge-reranker-v2-m3
       RERANKER_FP16: "true"
+      # STT — Groq + LLM
+      GROQ_STT_API_KEY: ${GROQ_STT_API_KEY:-${GROQ_API_KEY}}
+      GROQ_LLM_API_KEY: ${GROQ_LLM_API_KEY:-${GROQ_API_KEY}}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      # AIA DB (운영 PMS DB)
+      DB_HOST: ${STT_DB_HOST:-211.34.228.191}
+      DB_PORT: ${STT_DB_PORT:-3336}
+      DB_USER: ${STT_DB_USER:-peh0322}
+      DB_PASSWORD: ${STT_DB_PASSWORD:-dmsWkd0819!@#}
+      DB_NAME: ${STT_DB_NAME:-PMS}
     volumes:
       - reranker_cache:/root/.cache/huggingface
+      - stt_inbox:/app/inbox
+      - stt_recordings:/app/recordings
+      - stt_results:/app/results
     restart: unless-stopped
 
   app:
@@ -43,7 +61,7 @@ services:
       SERVER_PORT: 8080
       OLLAMA_URL: http://ollama:11434
       QDRANT_URL: http://qdrant:6333
-      RERANKER_URL: http://reranker:8000
+      RERANKER_URL: http://python-svc:8000   # 단일 통합 서비스로 변경
       RAG_DATA_DIR: /app/data
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
@@ -54,54 +72,12 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       RAG_RERANKER_MIN_SCORE: "0.6"
       RAG_QUERY_REWRITE_ENABLED: "true"
-      LOCAL_DB_URL: jdbc:mariadb://mariadb-local:3306/recallai
-      LOCAL_DB_USERNAME: recallai
-      LOCAL_DB_PASSWORD: recallai
     volumes:
       - app_data:/app/data
     depends_on:
       - qdrant
       - ollama
-      - reranker
-      - mariadb-local
-    restart: unless-stopped
-
-  stt:
-    build: ./stt
-    container_name: stt
-    ports:
-      - "8001:8001"
-    environment:
-      PYTHONUNBUFFERED: "1"
-      GROQ_STT_API_KEY: ${GROQ_STT_API_KEY:-${GROQ_API_KEY}}
-      GROQ_LLM_API_KEY: ${GROQ_LLM_API_KEY:-${GROQ_API_KEY}}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
-      DB_HOST: ${STT_DB_HOST:-211.34.228.191}
-      DB_PORT: ${STT_DB_PORT:-3336}
-      DB_USER: ${STT_DB_USER:-peh0322}
-      DB_PASSWORD: ${STT_DB_PASSWORD:-dmsWkd0819!@#}
-      DB_NAME: ${STT_DB_NAME:-PMS}
-    volumes:
-      - stt_inbox:/app/inbox
-      - stt_recordings:/app/recordings
-      - stt_results:/app/results
-    restart: unless-stopped
-
-  mariadb-local:
-    image: mariadb:10.11
-    container_name: mariadb-local
-    ports:
-      - "3307:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: test
-      MYSQL_DATABASE: recallai
-      MYSQL_USER: recallai
-      MYSQL_PASSWORD: recallai
-    volumes:
-      - mariadb_local_data:/var/lib/mysql
-      - ./stt/sql:/docker-entrypoint-initdb.d   # 초기 DDL 자동 실행
+      - python-svc
     restart: unless-stopped
 
   portainer:
@@ -119,9 +95,7 @@ volumes:
   ollama_models:
   reranker_cache:
   app_data:
-  mariadb_local_data:
   portainer_data:
   stt_inbox:
   stt_recordings:
   stt_results:
-

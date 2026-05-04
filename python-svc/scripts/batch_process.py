@@ -1,31 +1,40 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 4월녹음 폴더에서 mp3를 골라 STT 처리하는 로컬 배치 스크립트.
 
 사용법:
-    python batch_process.py               # 기본 3개 처리
-    python batch_process.py --batch 5     # 5개 처리
-    python batch_process.py --save-db     # DB 저장도 함께
-    python batch_process.py --list        # 미처리 목록만 출력
-    python batch_process.py --src "D:/다른폴더"
+    python scripts/batch_process.py               # 기본 3개 처리
+    python scripts/batch_process.py --batch 5     # 5개 처리
+    python scripts/batch_process.py --save-db     # AIA_CALL_* DB에 저장도 함께
+    python scripts/batch_process.py --list        # 미처리 목록만 출력
+    python scripts/batch_process.py --src "D:/다른폴더"
 """
 
 import argparse, json, shutil, sys
 from pathlib import Path
 
-BASE_DIR    = Path(__file__).parent
-RESULTS_DIR = BASE_DIR / "results"
-DONE_DIR    = BASE_DIR / "recordings"
-DATA_DIR    = BASE_DIR.parent / "data"
-HOTELS_JSON = DATA_DIR / "hotels.json"
+# 부모 폴더(python-svc/) 모듈 import 가능하게
+SVC_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(SVC_DIR))
+
+from stt_router import RESULTS_DIR, DONE_DIR, DATA_DIR, HOTELS_JSON
+from transcribe_summarize import (
+    parse_filename_meta, transcribe_groq, summarize,
+    save_markdown_report, _inject_caller_contact,
+)
+from hotel_matcher import (
+    load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
+    find_hotel_by_call_no, find_hotel_by_phone_lookup,
+    find_hotel_from_text, find_cmpx_from_text, add_alias,
+)
+from corrections import DAOL_RECEIVER_NOS
+from db_utils import save_to_aia, DB_DEFAULT
+
 DEFAULT_SRC = Path(r"C:\Users\eh\Downloads\4월녹음")
 
 RESULTS_DIR.mkdir(exist_ok=True)
 DONE_DIR.mkdir(exist_ok=True)
-
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
 
 
 def already_done(stem: str) -> bool:
@@ -39,17 +48,6 @@ def list_pending(src: Path) -> list:
 
 def process_file(audio_path: Path, save_db: bool, db_cfg: dict):
     print(f"\n{'='*60}\n처리 시작: {audio_path.name}\n{'='*60}")
-
-    from transcribe_summarize import (
-        parse_filename_meta, transcribe_groq, summarize,
-        save_markdown_report, _inject_caller_contact,
-    )
-    from hotel_matcher import (
-        load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
-        find_hotel_by_call_no, find_hotel_by_phone_lookup,
-        find_hotel_from_text, find_cmpx_from_text, add_alias,
-    )
-    from corrections import DAOL_RECEIVER_NOS
 
     meta        = parse_filename_meta(str(audio_path))
     caller_no   = meta["caller_no"]
@@ -126,10 +124,16 @@ def process_file(audio_path: Path, save_db: bool, db_cfg: dict):
               or (matched_hotel.get("propShrtNm") if matched_hotel else None)
 
     result = {
-        "audio_file": audio_path.name, "caller_no": caller_no,
-        "receiver_no": receiver_no, "call_dt": call_dt,
-        "prop_cd": prop_cd, "cmpx_cd": cmpx_cd, "cmpx_nm": cmpx_nm,
-        "stt": stt_result, "summary": summary,
+        "audio_file":   audio_path.name,
+        "base_file_nm": audio_path.name,
+        "caller_no":    caller_no,
+        "receiver_no":  receiver_no,
+        "call_dt":      call_dt,
+        "prop_cd":      prop_cd,
+        "cmpx_cd":      cmpx_cd,
+        "cmpx_nm":      cmpx_nm,
+        "stt":          stt_result,
+        "summary":      summary,
     }
 
     out_json = RESULTS_DIR / f"{audio_path.stem}.json"
@@ -138,7 +142,6 @@ def process_file(audio_path: Path, save_db: bool, db_cfg: dict):
     save_markdown_report(str(out_json.with_suffix(".md")), audio_path.name, stt_result, summary)
 
     if save_db and db_cfg:
-        from db_utils import save_to_aia
         rec_seq_no = save_to_aia(result, db_cfg)
         if rec_seq_no:
             result["rec_seq_no"] = rec_seq_no
@@ -183,7 +186,6 @@ def main():
 
     db_cfg = None
     if args.save_db:
-        from db_utils import DB_DEFAULT
         db_cfg = dict(DB_DEFAULT)
 
     for audio_path in targets:

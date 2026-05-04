@@ -1,28 +1,37 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-AI 서버 — 녹음 파일 수신 API
+STT 라우터 — 녹음 파일 수신 + 백그라운드 STT 파이프라인.
 
 kt-call-bot이 POST /api/recording 으로 mp3를 보내면
-inbox/ 에 저장 후 백그라운드에서 STT → CALL_QUEUE 자동 처리.
-
-실행:
-    uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+inbox/ 에 저장 후 백그라운드에서 STT → AIA_CALL_* 자동 처리.
 """
 
+import hashlib
+import json
 import os
 import re
 import shutil
 import threading
 from pathlib import Path
-from contextlib import asynccontextmanager
 
-# 동시 Groq API 호출 방지 — 파일 1개씩 순차 처리
-_PROCESS_LOCK = threading.Lock()
-
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+
+from db_utils import DB_DEFAULT, save_to_aia
+from transcribe_summarize import (
+    parse_filename_meta, transcribe_groq, summarize, save_markdown_report,
+    _inject_caller_contact,
+)
+from hotel_matcher import (
+    load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
+    find_hotel_by_call_no, find_hotel_by_phone_lookup,
+    find_hotel_from_text, find_cmpx_from_text, add_alias,
+)
+from corrections import DAOL_RECEIVER_NOS
+
+# ── 동시 Groq API 호출 방지 — 파일 1개씩 순차 처리 ─────────────
+_PROCESS_LOCK = threading.Lock()
 
 # ── 경로 설정 ──────────────────────────────────────────────────
 BASE_DIR     = Path(__file__).parent
@@ -37,9 +46,6 @@ DONE_DIR.mkdir(exist_ok=True)
 RESULTS_DIR.mkdir(exist_ok=True)
 
 # ── DB 기본값 (환경변수로 오버라이드 가능) ────────────────────
-from db_utils import DB_DEFAULT
-import db_utils
-
 DB_CFG = {
     "host":     os.environ.get("DB_HOST",     DB_DEFAULT["host"]),
     "port":     int(os.environ.get("DB_PORT", DB_DEFAULT["port"])),
@@ -69,7 +75,7 @@ def is_already_processed(base_filename: str) -> bool:
         conn.close()
         return row is not None
     except Exception:
-        # DB 연결 실패 시 파일 존재 여부를 results/ 폴더로 판단
+        # DB 연결 실패 시 results/ 폴더로 판단
         stem = Path(base_filename).stem
         return (RESULTS_DIR / f"{stem}.json").exists()
 
@@ -87,29 +93,6 @@ def process_recording(file_path: Path):
 
 
 def _process_recording_inner(file_path: Path):
-    import sys
-    # 같은 디렉토리의 모듈 import 보장
-    if str(BASE_DIR) not in sys.path:
-        sys.path.insert(0, str(BASE_DIR))
-
-    try:
-        from transcribe_summarize import (
-            parse_filename_meta, transcribe_groq,
-            summarize, save_markdown_report, _inject_caller_contact, _inject_hotel_name,
-        )
-        from hotel_matcher import (
-            load_hotels, load_phone_lookup, build_alias_pairs,
-            fix_hotel_names, find_hotel_by_call_no,
-            find_hotel_by_phone_lookup, find_hotel_from_text, add_alias,
-            find_cmpx_from_text,
-        )
-        from db_utils import lookup_caller_history, save_to_aia
-    except ImportError as e:
-        print(f"[서버] import 실패: {e}")
-        return
-
-    import json
-
     audio_path = str(file_path)
     print(f"[서버] 처리 시작: {file_path.name}")
 
@@ -156,7 +139,7 @@ def _process_recording_inner(file_path: Path):
         if not pre_hotel and phone_lookup and receiver_no:
             pre_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
         hotel_display = (pre_cmpx.get("cmpxNm") if pre_cmpx else None) or (pre_hotel.get("propShrtNm") if pre_hotel else None)
-        from corrections import DAOL_RECEIVER_NOS
+
         summarize_ctx = {
             "caller_no":   caller_no,
             "receiver_no": receiver_no,
@@ -166,12 +149,12 @@ def _process_recording_inner(file_path: Path):
             "daol_nos":    DAOL_RECEIVER_NOS,
         }
         summary = summarize(stt_result["segments"], context=summarize_ctx)
+
         if summary and "error" not in summary:
-            from corrections import DAOL_RECEIVER_NOS as _DNOS
             _contact = None
-            if receiver_no and receiver_no not in _DNOS:
+            if receiver_no and receiver_no not in DAOL_RECEIVER_NOS:
                 _contact = receiver_no
-            elif caller_no and caller_no not in _DNOS:
+            elif caller_no and caller_no not in DAOL_RECEIVER_NOS:
                 _contact = caller_no
             else:
                 _contact = caller_no or receiver_no
@@ -188,7 +171,7 @@ def _process_recording_inner(file_path: Path):
                 summary["report"] = "\n".join(_lines)
                 print(f"[연락처 주입] {_contact}")
 
-        # 호텔 매칭
+        # 호텔 매칭 — 결과는 응답 JSON에만 포함, AIA 테이블에는 저장 안 함
         prop_cd, cmpx_cd, matched_hotel, matched_cmpx = None, None, None, None
 
         matched_hotel, matched_cmpx = find_hotel_by_call_no(caller_no, hotels)
@@ -210,12 +193,6 @@ def _process_recording_inner(file_path: Path):
             matched_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
             if matched_hotel:
                 prop_cd = matched_hotel.get("propCd")
-
-        if not matched_hotel and caller_no:
-            hist_prop, hist_cmpx = lookup_caller_history(caller_no, DB_CFG)
-            if hist_prop:
-                prop_cd = hist_prop
-                cmpx_cd = hist_cmpx
 
         if not matched_hotel and summary and "error" not in summary:
             search_text = " ".join(filter(None, [
@@ -242,7 +219,6 @@ def _process_recording_inner(file_path: Path):
         cmpx_nm = (matched_cmpx.get("cmpxNm") if matched_cmpx else None) \
                   or (matched_hotel.get("propShrtNm") if matched_hotel else None)
 
-        import hashlib
         file_bytes  = file_path.read_bytes()
         sha256_hash = hashlib.sha256(file_bytes).hexdigest()
 
@@ -268,7 +244,7 @@ def _process_recording_inner(file_path: Path):
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
 
-        # DB 저장
+        # DB 저장 (AIA_CALL_RECORDING + TRANSCRIPT + ANALYSIS)
         rec_seq_no = save_to_aia(result, DB_CFG)
         if rec_seq_no:
             result["rec_seq_no"] = rec_seq_no
@@ -276,7 +252,6 @@ def _process_recording_inner(file_path: Path):
                 json.dump(result, f, ensure_ascii=False, indent=2)
 
         # MD 리포트
-        from transcribe_summarize import save_markdown_report
         md_path = str(output_path.with_suffix(".md"))
         save_markdown_report(md_path, file_path.name, stt_result, summary)
 
@@ -290,23 +265,11 @@ def _process_recording_inner(file_path: Path):
         traceback.print_exc()
 
 
-# ── FastAPI 앱 ─────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print(f"[서버] 시작 | inbox: {INBOX_DIR}, DB: {DB_CFG['host']}:{DB_CFG['port']}")
-    yield
-
-app = FastAPI(title="RecallAI STT Server", version="1.0.0", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ── FastAPI 라우터 ────────────────────────────────────────────
+router = APIRouter(tags=["stt"])
 
 
-@app.post("/api/recording")
+@router.post("/api/recording")
 async def upload_recording(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -318,7 +281,7 @@ async def upload_recording(
     파일을 inbox/ 에 저장 후 백그라운드에서 STT 파이프라인 실행.
 
     ?force=true — 이미 처리된 파일도 재처리 (STT 품질 개선 등 수동 재처리용).
-    CALL_QUEUE는 upsert이므로 기존 레코드를 덮어씁니다.
+    AIA_CALL_RECORDING은 BASE_FILE_NM UNIQUE라 UPSERT로 갱신됩니다.
     """
     original_name = file.filename or "unknown.mp3"
     base_name     = normalize_filename(original_name)
@@ -356,11 +319,9 @@ async def upload_recording(
     )
 
 
-@app.get("/api/recording/exists")
+@router.get("/api/recording/exists")
 async def check_exists(filename: str):
-    """
-    kt-call-bot 조기 중단용 — 이미 처리된 파일인지 확인.
-    """
+    """kt-call-bot 조기 중단용 — 이미 처리된 파일인지 확인."""
     base_name = normalize_filename(filename)
     exists    = is_already_processed(base_name)
 
@@ -371,7 +332,7 @@ async def check_exists(filename: str):
     return {"exists": exists, "filename": base_name}
 
 
-@app.get("/api/admin/status")
+@router.get("/api/admin/status")
 async def status():
     """파이프라인 현황 — inbox 대기 수, 처리 완료 수."""
     inbox_count   = len(list(INBOX_DIR.glob("*.mp3")))
@@ -384,7 +345,7 @@ async def status():
     }
 
 
-@app.post("/api/admin/process-inbox")
+@router.post("/api/admin/process-inbox")
 async def process_inbox(background_tasks: BackgroundTasks):
     """inbox/ 에 있는 미처리 mp3 파일 전체를 백그라운드에서 처리."""
     files = list(INBOX_DIR.glob("*.mp3"))
@@ -397,8 +358,3 @@ async def process_inbox(background_tasks: BackgroundTasks):
             background_tasks.add_task(process_recording, f)
             queued.append(f.name)
     return {"queued": len(queued), "skipped": len(skipped), "files": queued}
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}

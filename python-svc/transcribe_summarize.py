@@ -22,7 +22,6 @@ import os
 import re
 import sys
 import time
-import urllib.request
 import requests as _requests
 from pathlib import Path
 
@@ -32,15 +31,7 @@ from hotel_matcher import (
     find_hotel_by_call_no, find_hotel_by_phone_lookup,
     find_hotel_from_text, find_cmpx_from_text, add_alias,
 )
-from db_utils import DB_DEFAULT, lookup_caller_history, save_to_aia
-
-# Windows 한글 콘솔(cp949)에서 유니코드 출력 깨짐 방지
-if sys.platform == "win32":
-    try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-    except (AttributeError, ValueError):
-        pass
+from db_utils import DB_DEFAULT, save_to_aia
 
 # .env 파일 자동 로드 (환경변수 없을 때 폴백)
 _env_file = Path(__file__).parent / ".env"
@@ -53,8 +44,6 @@ if _env_file.exists():
 
 GROQ_STT_API_KEY = os.environ.get("GROQ_STT_API_KEY") or os.environ.get("GROQ_API_KEY")
 GROQ_LLM_API_KEY = os.environ.get("GROQ_LLM_API_KEY") or os.environ.get("GROQ_API_KEY")
-if not GROQ_STT_API_KEY:
-    sys.exit("❌ GROQ_STT_API_KEY 없음. stt/.env 파일에 추가하세요.")
 
 GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
 OPENAI_API_KEY  = os.environ.get("OPENAI_API_KEY", "")
@@ -104,24 +93,11 @@ def parse_filename_meta(audio_path: str) -> dict:
 # STT
 # ────────────────────────────────────────────────────────────────
 
-def _build_multipart(fields: dict, filename: str, file_data: bytes) -> tuple:
-    import uuid
-    boundary = uuid.uuid4().hex
-    body = b""
-    for name, value in fields.items():
-        body += (f"--{boundary}\r\n"
-                 f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
-                 f"{value}\r\n").encode("utf-8")
-    body += (f"--{boundary}\r\n"
-             f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-             f"Content-Type: audio/mpeg\r\n\r\n").encode("utf-8")
-    body += file_data + b"\r\n"
-    body += f"--{boundary}--\r\n".encode("utf-8")
-    return body, f"multipart/form-data; boundary={boundary}"
-
-
 def transcribe_groq(audio_path: str) -> dict:
     """Groq Whisper API로 STT — CPU 부하 없음, 5분 통화 → 약 10초."""
+    if not GROQ_STT_API_KEY:
+        raise RuntimeError("GROQ_STT_API_KEY 없음 — .env 또는 환경변수에 추가 필요")
+
     print(f"[STT-Groq] 전송 중: {audio_path}")
     t0 = time.time()
 
@@ -145,8 +121,7 @@ def transcribe_groq(audio_path: str) -> dict:
         if resp.status_code == 429:
             wait = 60
             try:
-                import re as _re
-                m = _re.search(r"try again in ([0-9.]+)s", resp.text)
+                m = re.search(r"try again in ([0-9.]+)s", resp.text)
                 if m:
                     wait = int(float(m.group(1))) + 2
             except Exception:
@@ -615,10 +590,18 @@ def save_markdown_report(md_path: str, audio_filename: str,
 
 
 # ────────────────────────────────────────────────────────────────
-# 메인 파이프라인
+# 메인 파이프라인 (단독 CLI 실행용)
 # ────────────────────────────────────────────────────────────────
 
 def main():
+    # Windows 한글 콘솔(cp949)에서 유니코드 출력 깨짐 방지 — CLI 실행 시에만
+    if sys.platform == "win32":
+        try:
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     parser = argparse.ArgumentParser(
         description="호텔 통화 녹음(.mp3) → STT → 요약",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -636,7 +619,7 @@ def main():
     parser.add_argument("--hotels", default=None,
                         help="hotels.json 경로. 생략 시 ../data/hotels.json 자동 탐색.")
     parser.add_argument("--save-db", action="store_true",
-                        help="처리 완료 후 로컬 MariaDB(CALL_QUEUE)에 저장")
+                        help="처리 완료 후 AIA_CALL_* 테이블에 저장")
     parser.add_argument("--db-host",     default=DB_DEFAULT["host"])
     parser.add_argument("--db-port",     default=DB_DEFAULT["port"], type=int)
     parser.add_argument("--db-user",     default=DB_DEFAULT["user"])
@@ -730,12 +713,12 @@ def main():
     else:
         print("[요약] 스킵 (--no-summary)")
 
-    # Step 2.5 — 호텔 매칭 (0순위: 수신번호 → 1순위: phone_lookup → 2순위: 히스토리 → 3순위: 텍스트)
+    # Step 2.5 — 호텔 매칭 (수신번호 → phone_lookup → 텍스트)
+    # 매칭 결과는 응답 JSON에만 포함. AIA 테이블에는 저장하지 않음 (화면에서 매핑).
     prop_cd, cmpx_cd = None, None
     if hotels:
         matched_hotel, matched_cmpx = None, None
 
-        # 발신번호 우선 시도 (호텔 → 다올 비전 인바운드가 일반적), 실패 시 수신번호
         matched_hotel, matched_cmpx = find_hotel_by_call_no(caller_no, hotels)
         if matched_hotel:
             prop_cd  = matched_hotel.get("propCd")
@@ -761,14 +744,6 @@ def main():
             if matched_hotel:
                 prop_cd = matched_hotel.get("propCd")
                 print(f"[호텔] phone_lookup 매칭(수신): {matched_hotel.get('propShrtNm')} (prop_cd={prop_cd})")
-
-        if not matched_hotel and caller_no and args.save_db:
-            hist_prop, hist_cmpx = lookup_caller_history(caller_no, db_cfg)
-            if hist_prop:
-                prop_cd       = hist_prop
-                cmpx_cd       = hist_cmpx
-                matched_hotel = next((h for h in hotels if h.get("propCd") == prop_cd), None)
-                print(f"[호텔] 발신번호 히스토리 매칭: prop_cd={prop_cd}, cmpx_cd={cmpx_cd}")
 
         if not matched_hotel and summary and "error" not in summary:
             search_text = " ".join(filter(None, [
@@ -796,8 +771,6 @@ def main():
         if not matched_hotel:
             print("[호텔] 매칭 실패 — prop_cd=null (상담사가 UI에서 선택 필요)")
 
-        # 호텔명은 propCd로 관리하므로 report의 '문의자' 줄에는 삽입하지 않음
-
     result = {
         "audio_file":  os.path.basename(audio_path),
         "caller_no":   caller_no,
@@ -814,9 +787,9 @@ def main():
     print(f"\n✅ JSON 저장: {output_path}")
 
     if args.save_db:
-        call_id = save_to_aia(result, db_cfg)
-        if call_id:
-            result["rec_seq_no"] = call_id
+        rec_seq_no = save_to_aia(result, db_cfg)
+        if rec_seq_no:
+            result["rec_seq_no"] = rec_seq_no
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
 
@@ -838,43 +811,6 @@ def main():
         print("💬 피드백 (FEEDBACK):")
         print("=" * 60)
         print(f"  {summary.get('feedback', '(비어있음)')}")
-
-        print("\n" + "=" * 60)
-        print("🎭 화자 추정:")
-        print("=" * 60)
-        for k in ["speaker_A", "speaker_B", "inquirer", "responder"]:
-            if k in summary:
-                print(f"  {k}: {summary[k]}")
-
-        dialogue = summary.get("dialogue", [])
-        if dialogue:
-            print("\n" + "=" * 60)
-            print(f"💬 화자 분리 대화록 ({len(dialogue)}줄):")
-            print("=" * 60)
-            for d in dialogue[:20]:
-                spk   = d.get("speaker", "?")
-                start = d.get("start", 0)
-                mmss  = f"{int(start // 60):d}:{int(start % 60):02d}"
-                print(f"  [{mmss}] {spk}: {d.get('text', '')}")
-            if len(dialogue) > 20:
-                print(f"  ... (전체 {len(dialogue)}줄, JSON 파일 참조)")
-
-        print("\n" + "=" * 60)
-        print("📋 구조화 분석:")
-        print("=" * 60)
-        for k in ["question", "context", "answer_given", "status", "category", "summary"]:
-            if k in summary:
-                print(f"  {k}: {summary[k]}")
-        if summary.get("actions_taken"):
-            print("  actions_taken:")
-            for item in summary["actions_taken"]:
-                print(f"    - {item}")
-        if summary.get("follow_up") and summary["follow_up"] != "없음":
-            print(f"  follow_up: {summary['follow_up']}")
-    elif summary and "error" in summary:
-        print(f"\n⚠️ 요약 실패: {summary['error']}")
-        if "raw" in summary:
-            print(f"   원문 일부: {summary['raw'][:200]}")
 
 
 if __name__ == "__main__":

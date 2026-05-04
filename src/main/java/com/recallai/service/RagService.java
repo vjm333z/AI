@@ -699,7 +699,7 @@ public class RagService {
         return sources;
     }
 
-    /** CALL_QUEUE 승인 후 단건 즉시 인덱싱. 실패 시 failureTracker에 기록하고 예외 전파. */
+    /** KOK_CALL_MNTR 등록 직후 단건 즉시 Qdrant 인덱싱. */
     public void indexSingle(KokCallMntrDto dto) throws Exception {
         String text = dto.toEmbeddingText();
         if (text.isEmpty()) {
