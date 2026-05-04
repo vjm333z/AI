@@ -1,0 +1,23 @@
+# 처리 중 파일 (런타임 생성, git 제외)
+inbox/
+recordings/
+results/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# 환경 설정
+.env
+*.env
+
+# 모델 캐시 (bge-reranker 등)
+models/
+*.bin
+*.safetensors

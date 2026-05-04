@@ -140,18 +140,17 @@ def save_to_aia(result: dict, db_cfg: dict) -> int:
             "system_cd":      summary.get("system_cd"),
             "system_tp":      summary.get("system_tp"),
             "followup_note":  summary.get("feedback"),
-            "resolve_status": summary.get("status"),
             "llm_model":      _resolve_llm_model(),
             "reg_user":       REG_USER_DEFAULT,
         }
         analysis_sql = """
             INSERT INTO AIA_CALL_ANALYSIS
                 (REC_SEQ_NO, CMPX_NM, CUST_NM, CUST_PHONE, INQ_DESC, AI_SUMMARY,
-                 CATEGORY_CD, URGENCY_CD, SYSTEM_CD, SYSTEM_TP, FOLLOWUP_NOTE, RESOLVE_STATUS,
+                 CATEGORY_CD, URGENCY_CD, SYSTEM_CD, SYSTEM_TP, FOLLOWUP_NOTE,
                  LLM_MODEL, REG_USER)
             VALUES
                 (%(rec_seq_no)s, %(cmpx_nm)s, %(cust_nm)s, %(cust_phone)s, %(inq_desc)s, %(ai_summary)s,
-                 %(category_cd)s, %(urgency_cd)s, %(system_cd)s, %(system_tp)s, %(followup_note)s, %(resolve_status)s,
+                 %(category_cd)s, %(urgency_cd)s, %(system_cd)s, %(system_tp)s, %(followup_note)s,
                  %(llm_model)s, %(reg_user)s)
             ON DUPLICATE KEY UPDATE
                 CMPX_NM        = VALUES(CMPX_NM),
@@ -164,7 +163,6 @@ def save_to_aia(result: dict, db_cfg: dict) -> int:
                 SYSTEM_CD      = VALUES(SYSTEM_CD),
                 SYSTEM_TP      = VALUES(SYSTEM_TP),
                 FOLLOWUP_NOTE  = VALUES(FOLLOWUP_NOTE),
-                RESOLVE_STATUS = VALUES(RESOLVE_STATUS),
                 LLM_MODEL      = VALUES(LLM_MODEL),
                 MOD_USER       = VALUES(REG_USER),
                 MOD_DT         = CURRENT_TIMESTAMP
