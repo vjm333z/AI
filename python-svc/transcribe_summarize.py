@@ -45,9 +45,8 @@ if _env_file.exists():
 GROQ_STT_API_KEY = os.environ.get("GROQ_STT_API_KEY") or os.environ.get("GROQ_API_KEY")
 GROQ_LLM_API_KEY = os.environ.get("GROQ_LLM_API_KEY") or os.environ.get("GROQ_API_KEY")
 
-GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
 OPENAI_API_KEY  = os.environ.get("OPENAI_API_KEY", "")
-LLM_PROVIDER    = os.environ.get("LLM_PROVIDER", "openai")  # openai | gemini | groq
+LLM_PROVIDER    = os.environ.get("LLM_PROVIDER", "openai")  # openai | groq
 
 GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
@@ -56,9 +55,6 @@ GROQ_STT_MODEL = "whisper-large-v3"
 
 OPENAI_URL   = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-
-GEMINI_LLM_MODEL = os.environ.get("GEMINI_LLM_MODEL", "gemini-2.5-flash")
-GEMINI_LLM_URL   = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_LLM_MODEL}:generateContent"
 
 
 # ────────────────────────────────────────────────────────────────
@@ -279,52 +275,6 @@ def _inject_caller_contact(report: str, caller_no: str, receiver_no: str = None)
     return re.sub(r"연락처\s*:[ \t]*.*", f"연락처: {contact}", report)
 
 
-def _call_gemini_llm(user_input: str, timeout: int = 60) -> dict:
-    """Gemini API로 STT 요약 JSON 반환. 실패 시 예외 발생."""
-    if not GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY 없음")
-
-    url = f"{GEMINI_LLM_URL}?key={GEMINI_API_KEY}"
-    body = {
-        "system_instruction": {"parts": [{"text": SUMMARIZE_SYSTEM_PROMPT}]},
-        "contents": [{"role": "user", "parts": [{"text": user_input}]}],
-        "generationConfig": {
-            "temperature": 0.2,
-            "maxOutputTokens": 4000,
-            "responseMimeType": "application/json",
-            "thinkingConfig": {"thinkingBudget": 0},
-        },
-    }
-
-    for attempt in range(4):
-        resp = _requests.post(url, json=body, timeout=timeout)
-        if resp.status_code == 429:
-            m = re.search(r"retry in ([0-9.]+)s", resp.text)
-            wait = float(m.group(1)) + 2.0 if m else 60.0
-            print(f"[요약-Gemini] Rate limit (429) — {wait:.1f}초 후 재시도 ({attempt+1}/4)")
-            time.sleep(wait)
-            continue
-        if not resp.ok:
-            raise RuntimeError(f"Gemini HTTP {resp.status_code}: {resp.text[:300]}")
-        break
-    else:
-        raise RuntimeError("Gemini rate limit 재시도 초과")
-
-    candidates = resp.json().get("candidates", [])
-    if not candidates:
-        raise RuntimeError("Gemini 응답에 candidates 없음")
-    parts = candidates[0].get("content", {}).get("parts", [])
-    content = None
-    for part in parts:
-        if part.get("thought"):
-            continue
-        content = part.get("text", "")
-        break
-    if not content:
-        raise RuntimeError("Gemini 응답에 text 없음")
-    return json.loads(content)
-
-
 def _call_openai_llm(user_input: str, timeout: int = 60) -> dict:
     """OpenAI gpt-4o-mini로 STT 요약 JSON 반환. 실패 시 예외 발생."""
     if not OPENAI_API_KEY:
@@ -405,18 +355,9 @@ def summarize(segments: list, context: dict = None, timeout: int = 60) -> dict:
         except Exception as e:
             print(f"[요약] OpenAI 실패, Groq 폴백: {e}")
 
-    # Gemini 시도
-    if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
-        try:
-            result = _call_gemini_llm(user_input, timeout=timeout)
-            print(f"[요약] Gemini 완료 ({time.time()-t0:.1f}초)")
-            return result
-        except Exception as e:
-            print(f"[요약] Gemini 실패, Groq 폴백: {e}")
-
     # Groq 폴백
     if not GROQ_LLM_API_KEY:
-        return {"error": "GROQ_LLM_API_KEY 없음 — Gemini도 실패했거나 설정 안 됨"}
+        return {"error": "GROQ_LLM_API_KEY 없음 — OpenAI도 실패했거나 설정 안 됨"}
 
     body = {
         "model": GROQ_MODEL,

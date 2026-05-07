@@ -70,7 +70,7 @@ public class RagProperties {
 
     @Data
     public static class Templatize {
-        /** HyDE 적재에 사용할 LLM provider (groq / claude / gemini / openai). */
+        /** HyDE 적재에 사용할 LLM provider (groq / openai). */
         private String provider = "groq";
     }
 }

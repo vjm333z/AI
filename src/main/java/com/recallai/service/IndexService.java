@@ -145,7 +145,8 @@ public class IndexService {
                                 consecutiveFails, ok, list.size() - existingSeqs.size());
                         break;
                     }
-                    try { Thread.sleep(4000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+                    // LLM 실패 후 짧은 backoff (OpenAI Tier 1 기준 충분)
+                    try { Thread.sleep(1000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
                     continue;
                 }
                 consecutiveFails = 0;
@@ -176,8 +177,8 @@ public class IndexService {
                     log.warn("Templated upsert 실패 seq_no={}, cause={}", dto.getSeqNo(), e.getMessage());
                     failureTracker.record(dto.getSeqNo(), "templated: " + e.getMessage());
                 }
-                // Gemini 2.5 Flash 무료 tier: 5 RPM → 12초 간격
-                try { Thread.sleep(12000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+                // OpenAI Tier 1: 500 RPM → 200ms 가능. 안전 마진 두고 500ms (6081건 ≈ 50분).
+                try { Thread.sleep(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             }
 
             log.info("Templated Index 완료: 성공={}, LLM실패={}, Upsert실패={}, 빈본문={}, 기존스킵={}",

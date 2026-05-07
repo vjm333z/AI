@@ -14,8 +14,8 @@ spring:
 groq:
   api-key: 여기에_Groq_API_키
 
-claude:
-  api-key: 여기에_Claude_API_키
+openai:
+  api-key: 여기에_OpenAI_API_키
 
 # 로컬에서는 localhost 사용 (docker-compose로 인프라 띄운 상태)
 ollama:

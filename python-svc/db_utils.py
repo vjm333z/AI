@@ -44,8 +44,6 @@ def _resolve_llm_model() -> str:
     provider = (os.environ.get("LLM_PROVIDER") or "openai").lower()
     if provider == "openai":
         return os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    if provider == "gemini":
-        return os.environ.get("GEMINI_LLM_MODEL", "gemini-2.5-flash")
     return "llama-3.3-70b-versatile"
 
 
