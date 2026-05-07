@@ -3,7 +3,7 @@
 베이스 URL: `http://localhost:8080` (RAG 앱), `http://localhost:8000` (python-svc — reranker + STT 통합)
 
 > python-svc는 reranker + STT를 단일 컨테이너로 통합한 서비스입니다.
-> CALL_QUEUE / `/api/queue/*` 계열은 폐기됐고, STT 결과는 운영 PMS DB의 `AIA_CALL_*` 테이블에 직접 저장됩니다.
+> STT 결과는 운영 PMS DB의 `AIA_CALL_*` 테이블에 직접 저장됩니다.
 
 ---
 

@@ -10,11 +10,11 @@ import os
 import re
 
 DB_DEFAULT = {
-    "host":     "211.34.228.191",
-    "port":     3336,
-    "user":     "peh0322",
-    "password": "dmsWkd0819!@#",
-    "database": "PMS",
+    "host":     os.environ.get("DB_HOST", "localhost"),
+    "port":     int(os.environ.get("DB_PORT", "3306")),
+    "user":     os.environ.get("DB_USER", ""),
+    "password": os.environ.get("DB_PASSWORD", ""),
+    "database": os.environ.get("DB_NAME", "PMS"),
 }
 
 REG_USER_DEFAULT = "STT_AUTO"

@@ -95,10 +95,6 @@ public class IndexFailureTracker {
         return set;
     }
 
-    public int count() {
-        return readAll().size();
-    }
-
     /** 성공한 seq_no들을 장부에서 제거 (파일 재작성). */
     public void removeSuccessful(Collection<Integer> successSeqs) {
         if (successSeqs == null || successSeqs.isEmpty()) return;
@@ -119,17 +115,6 @@ public class IndexFailureTracker {
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             } catch (IOException e) {
                 log.warn("실패 장부 정리 실패: {}", e.getMessage());
-            }
-        }
-    }
-
-    /** 장부 전체 비우기. */
-    public void clear() {
-        synchronized (lock) {
-            try {
-                Files.deleteIfExists(Paths.get(dataDir, FILE));
-            } catch (IOException e) {
-                log.warn("실패 장부 삭제 실패: {}", e.getMessage());
             }
         }
     }

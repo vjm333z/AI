@@ -4,8 +4,8 @@ server:
 spring:
   datasource:
     driver-class-name: org.mariadb.jdbc.Driver
-    url: ${DB_URL:jdbc:mariadb://211.34.228.178:3336/PMS}
-    username: ${DB_USERNAME:DEV}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
       initialization-fail-timeout: -1                 # DB 못붙어도 앱 시동되게 (lazy connect)

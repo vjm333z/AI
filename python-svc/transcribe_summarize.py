@@ -264,20 +264,6 @@ SUMMARIZE_SYSTEM_PROMPT = """너는 호텔 PMS 상담 통화 모노 녹취록을
 7. question / answer_given 은 각각 **inquirer / responder 발화에 근거**해 작성."""
 
 
-def _inject_hotel_name(report: str, hotel_short_name: str) -> str:
-    """DB 매칭 호텔명을 문의자 줄 앞에 붙임. LLM이 쓴 담당자/부서 정보는 보존."""
-    if not report or not hotel_short_name:
-        return report
-    def replacer(m):
-        existing = m.group(1).strip()
-        if hotel_short_name in existing:
-            return m.group(0)
-        if not existing or existing == "미확인":
-            return f"문의자 : {hotel_short_name}"
-        return f"문의자 : {hotel_short_name} {existing}"
-    return re.sub(r"문의자\s*:\s*(.*)", replacer, report)
-
-
 def _inject_caller_contact(report: str, caller_no: str, receiver_no: str = None) -> str:
     """다올 번호를 제외한 상대방 번호를 연락처에 주입."""
     if not report:

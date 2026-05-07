@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>기억사무소 RAG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --sidebar: #f0eee6;
+      --border: #e8e4d8;
+      --hover: #ebe7db;
+      --text: #1c1b19;
+      --text-dim: #6b675e;
+      --text-light: #9b968b;
+      --accent: #cc785c;
+      --accent-bg: rgba(204, 120, 92, 0.12);
+      --user-bubble: #e8e4d8;
+      --code-bg: #edeadf;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: "Inter", -apple-system, "Pretendard", "Malgun Gothic", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      grid-template-areas: "sidebar main";
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    /* ─── Sidebar ─── */
+    .sidebar {
+      grid-area: sidebar;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-top {
+      display: flex; align-items: center;
+      padding: 6px 8px 16px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 9px;
+      font-weight: 700; font-size: 15px;
+    }
+    .brand-logo {
+      width: 22px; height: 22px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .new-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      margin-bottom: 4px;
+      font-family: inherit;
+      text-align: left;
+      width: 100%;
+    }
+    .new-btn:hover { background: var(--hover); }
+    .new-btn svg { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      padding: 18px 10px 6px;
+      letter-spacing: 0.02em;
+    }
+    .toc {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      overflow-y: auto;
+      flex: 1;
+      margin: 0 -2px;
+      padding: 0 2px;
+    }
+    .toc-item {
+      padding: 8px 10px;
+      font-size: 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text);
+      transition: background 0.12s;
+      font-weight: 400;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .toc-item:hover { background: var(--hover); }
+    .toc-item.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .toc-item.completed { color: var(--text-light); }
+
+    .progress-mini {
+      padding: 10px 10px 6px;
+      margin-top: 6px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-bar-bg {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .progress-bar-fg {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s;
+      width: 0;
+    }
+
+    /* ─── Main ─── */
+    .main {
+      grid-area: main;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      overflow: hidden;
+    }
+    .chat {
+      overflow-y: auto;
+      padding: 40px 0 20px;
+      scroll-behavior: smooth;
+    }
+    .chat-inner {
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* User message — 오른쪽 크림 말풍선 */
+    .msg-user {
+      display: flex; justify-content: flex-end;
+      padding: 14px 0;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .msg-user .msg-body {
+      background: var(--user-bubble);
+      padding: 10px 16px;
+      border-radius: 18px;
+      max-width: 72%;
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    /* Assistant message — 배경 없이 헤더 + 본문 */
+    .msg-assistant {
+      padding: 14px 0 10px;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .msg-assistant .msg-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .msg-assistant .msg-header .avatar {
+      width: 20px; height: 20px;
+      color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .msg-assistant .msg-body {
+      font-size: 16px;
+      line-height: 1.75;
+      color: var(--text);
+    }
+    .msg-assistant .msg-body strong { font-weight: 700; color: var(--text); }
+    .msg-assistant .msg-body code {
+      background: var(--code-bg);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.88em;
+      font-family: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+    }
+    .msg-assistant .msg-body pre.msg-code {
+      background: #1e1e1d;
+      color: #e5e3da;
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin: 12px 0;
+      font-family: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+    .msg-assistant .msg-body br + br { content: ""; margin-top: 4px; }
+    .msg-image { margin-top: 12px; max-width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Divider */
+    .divider {
+      padding: 40px 0 6px;
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text-light);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Live block */
+    .live-block {
+      margin: 8px 0;
+      padding: 18px 20px;
+      background: white;
+      border: 1px solid var(--accent);
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(28, 27, 25, 0.04);
+    }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent); color: white;
+      padding: 3px 10px; border-radius: 4px;
+      font-size: 11px; font-weight: 700;
+      margin-bottom: 12px; letter-spacing: 0.06em;
+    }
+    .live-badge::before {
+      content: "●"; font-size: 8px;
+      animation: pulse 1.4s infinite;
+    }
+    @keyframes pulse { 50% { opacity: 0.4; } }
+    .live-question {
+      font-size: 16px; font-weight: 600;
+      margin-bottom: 14px; color: var(--text);
+    }
+    .live-question::before { content: "💬  "; }
+    .live-answer {
+      background: var(--bg);
+      padding: 14px 16px; border-radius: 10px;
+      font-size: 15px; line-height: 1.65;
+      white-space: pre-wrap; margin-bottom: 12px;
+      border-left: 3px solid var(--accent);
+    }
+    .live-answer.loading { color: var(--text-dim); font-style: italic; }
+    .live-sources-title {
+      font-size: 12px; font-weight: 700;
+      color: var(--text-dim);
+      margin-top: 14px; margin-bottom: 8px;
+    }
+    .live-source {
+      padding: 10px 12px;
+      background: var(--bg);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 13px; line-height: 1.55;
+    }
+    .live-source-meta {
+      font-size: 11px; color: var(--text-dim);
+      margin-bottom: 4px; font-variant-numeric: tabular-nums;
+    }
+
+    /* Typing cursor */
+    .typing-cursor {
+      display: inline-block;
+      width: 8px; height: 14px;
+      background: var(--text);
+      vertical-align: -2px;
+      margin-left: 1px;
+      border-radius: 1px;
+      animation: blink 1s steps(2) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Bottom fake input */
+    .input-zone {
+      padding: 12px 24px 18px;
+      background: var(--bg);
+    }
+    .input-box {
+      max-width: 740px;
+      margin: 0 auto;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 1px 2px rgba(28, 27, 25, 0.03);
+    }
+    .input-hint {
+      flex: 1;
+      color: var(--text-light);
+      font-size: 14px;
+    }
+    .input-keys {
+      display: flex; gap: 8px; align-items: center;
+      font-size: 11px; color: var(--text-dim);
+    }
+    .input-keys > span { display: flex; align-items: center; gap: 4px; }
+    kbd {
+      background: var(--bg);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", monospace;
+      font-size: 11px;
+      color: var(--text);
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 0 var(--border);
+      font-weight: 500;
+    }
+
+    /* 큰 화면에선 폰트 살짝 크게 */
+    @media (min-width: 1400px) {
+      .chat-inner { max-width: 820px; }
+      .msg-assistant .msg-body { font-size: 17px; }
+      .msg-user .msg-body { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ═════ Sidebar (Claude-style) ═════ -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">
+        <!-- Anthropic Claude sparkle 로고 오마주 (4-pointed curved star) -->
+        <svg class="brand-logo" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0 C12 6 18 12 24 12 C18 12 12 18 12 24 C12 18 6 12 0 12 C6 12 12 6 12 0 Z"/>
+        </svg>
+        <span>기억사무소</span>
+      </div>
+    </div>
+
+    <button class="new-btn" onclick="jumpTo(0); location.hash=''">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      <span>New chat</span>
+    </button>
+
+    <div class="section-label">Chapters</div>
+    <nav class="toc" id="toc"></nav>
+
+    <div class="progress-mini">
+      <div class="progress-bar-bg"><div class="progress-bar-fg" id="progressBar"></div></div>
+      <div id="progressText">0 / 0</div>
+    </div>
+  </aside>
+
+  <!-- ═════ Main ═════ -->
+  <div class="main">
+    <div class="chat" id="chat">
+      <div class="chat-inner" id="chatInner"></div>
+    </div>
+    <div class="input-zone">
+      <div class="input-box">
+        <span class="input-hint">질문을 입력하세요…</span>
+        <div class="input-keys">
+          <span><kbd>Space</kbd> 다음</span>
+          <span><kbd>←</kbd> 이전</span>
+          <span><kbd>R</kbd> 라이브</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════ 대화 스크립트 ═════ -->
+  <script type="application/json" id="scriptData">
+[
+  { "type": "divider", "title": "시작" },
+
+  { "type": "user", "text": "안녕하세요. 오늘 소개하실 프로젝트가 뭐죠?" },
+  { "type": "assistant", "text": "안녕하세요! 오늘 소개할 프로젝트는 **기억사무소 RAG**입니다.\n\n호텔 운영팀이 프런트 직원으로부터 키오스크·PMS 장애 문의를 받을 때, 과거 유사 사례와 조치 방안을 AI가 즉시 찾아주는 **사내 기술지원 KMS**예요.\n\n이름이 '기억사무소'인 이유는 — 모든 해결 경험을 잊지 않고 꺼내주는 시스템이라서예요." },
+
+  { "type": "user", "text": "발표인데 슬라이드가 아니라 왜 채팅으로 진행해요?" },
+  { "type": "assistant", "text": "세 가지 이유가 있어요.\n\n① 이 대회의 주제가 **AI 활용**인데, 슬라이드 대신 AI 인터페이스로 발표 자체를 시연하는 게 주제와 잘 맞아요.\n\n② 저희 프로젝트의 본질이 '상담사가 AI와 대화해 사례를 찾는다'인데, 발표 형식도 같으니 **일관성**이 생겨요.\n\n③ 단방향 슬라이드보다 대화가 **몰입도**가 높아요.\n\n지금 보시는 이 화면도 Spring Boot가 서빙하는 실제 서버 위에서 돌아가고 있어요." },
+
+  { "type": "divider", "title": "문제 정의" },
+
+  { "type": "user", "text": "이 시스템이 해결하려는 문제가 뭐예요?" },
+  { "type": "assistant", "text": "프런트 직원이 \"키오스크가 멈췄어요\" 전화해오면, 운영팀 상담사는 과거에 같은 장애가 있었는지 수동으로 검색하거나 선배를 호출해야 해요.\n\n저희 DB엔 **수천 건의 과거 완결 티켓**이 있는데, '예전에 누가 이거 해결했었지' 떠올리며 찾는 건 비효율적이죠.\n\nRAG로 **의미 기반 검색**을 해주면 2초 안에 유사 사례 3건 + 조치 초안이 나옵니다.\n\n더 나아가 **통화 녹취 파일을 자동으로 STT·요약**해서 접수 티켓까지 생성해줘요." },
+
+  { "type": "user", "text": "그냥 키워드 검색이랑은 뭐가 달라요?" },
+  { "type": "assistant", "text": "단어가 달라도 **의미가 같으면** 찾을 수 있어요.\n\n예를 들어 \"카드 결제 안돼요\"라고 물으면, 과거 티켓의 \"카드 승인 실패하였습니다\" 같은 표현도 잡아줍니다. 키워드 검색은 '결제'·'승인' 단어가 정확히 겹쳐야 찾지만, 임베딩 기반 검색은 **의미 공간**에서 가까운 벡터끼리 매칭돼요.\n\n저희가 쓰는 `bge-m3`는 한국어 특화 임베딩 모델이라 호텔 업무 용어도 잘 잡아요." },
+
+  { "type": "divider", "title": "Live Demo" },
+
+  { "type": "user", "text": "실제로 동작하는 거 보여주세요." },
+  { "type": "live", "question": "체크인 시 카드 결제가 되지 않을 때 어떻게 처리하나요", "mode": "default" },
+
+  { "type": "user", "text": "이거 얼마나 걸렸어요?" },
+  { "type": "assistant", "text": "**약 2초** 이내예요. 단계별로 보면:\n\n- 질문 확장 (Query Rewrite, Groq): 0.3초\n- 임베딩 변환 (bge-m3, 로컬 Ollama): 0.1초\n- Qdrant 벡터 검색 Top 10: 0.05초\n- Reranker 재정렬 (bge-reranker-v2-m3): 0.4초\n- MMR 다양성 재정렬: 0.01초\n- LLM 답변 생성 (Groq llama-3.3-70b): 0.8초\n\n상담사가 기다릴 수 있는 **체감 상한선(3초)** 안에 들어와요." },
+
+  { "type": "divider", "title": "데이터 정체성" },
+
+  { "type": "user", "text": "데이터는 어떤 건가요?" },
+  { "type": "assistant", "text": "`KOK_CALL_MNTR` 테이블에 쌓인 **과거 상담 티켓**으로, `FEEDBACK_YN='Y'`이면서 REPORT·FEEDBACK이 모두 있는 2026년 4월까지의 **완결 데이터**를 Qdrant에 적재했어요.\n\n**중요한 발견이 하나 있었어요.** 처음엔 '호텔 고객 민원 RAG'로 생각했는데, **500건을 샘플링해서 직접 읽어보니** 고객 민원은 한 건도 없고 전부 **프런트 직원 ↔ 운영팀 간 기술 장애 로그**였어요.\n\n그래서 포지셔닝을 '**사내 기술지원 KMS**'로 재조정했습니다. 이 발견 덕에 \"방구냄새가 심해요\" 같은 고객 민원성 질문이 매칭 안 되는 게 정상이라는 걸 명확히 할 수 있었어요.\n\n임베딩엔 TITLE을 제외하고 **문의 본문(REPORT)만** 사용해요 — Q-Q 매칭 취지에 맞춰 질문 의도만 임베딩하기 위해서예요." },
+
+  { "type": "divider", "title": "STT 파이프라인" },
+
+  { "type": "user", "text": "STT는 어떻게 작동해요?" },
+  { "type": "assistant", "text": "통화 녹음 파일이 들어오면 **자동으로 전체 파이프라인**이 돌아요.\n\n① `POST /api/recording` — KT 콜봇이 mp3를 업로드\n② **Groq Whisper** — STT 변환 (세그먼트별 타임스탬프 포함)\n③ **Groq llama-3.3-70b** — 문의자·연락처·문의내역·카테고리 추출 + 요약\n④ **호텔 매칭** — 발신번호·수신번호·phone_lookup·텍스트 순서로 자동 매칭\n⑤ **AIA_CALL_RECORDING / TRANSCRIPT / ANALYSIS** — MariaDB 자동 저장\n\n중복 파일은 SHA256으로 감지해 자동 차단하고, `?force=true` 파라미터로 재처리도 가능해요." },
+
+  { "type": "user", "text": "호텔 매칭은 어떻게 해요?" },
+  { "type": "assistant", "text": "4단계 폴백 전략이에요.\n\n**1단계**: 발신번호·수신번호가 호텔 직통번호인지 확인 (`hotels.json`)\n**2단계**: `phone_lookup.json` — 과거 통화 이력 기반 번호-호텔 매핑\n**3단계**: STT 텍스트에서 호텔명·별칭 추출 (fuzzy matching)\n**4단계**: AIA DB 이전 통화 이력으로 보완\n\n매칭된 `prop_cd`·`cmpx_cd`는 DB에 저장돼서 RAG 검색 시 **호텔별 필터**로도 활용돼요." },
+
+  { "type": "divider", "title": "HyDE 하이브리드" },
+
+  { "type": "user", "text": "검색 품질을 어떻게 끌어올렸어요?" },
+  { "type": "assistant", "text": "가장 큰 전략은 **Q-Q 대칭 매칭**이에요.\n\n사용자 질문은 짧은 의문문인데, 과거 티켓 본문은 긴 서술형 로그예요. 이 **비대칭**이 벡터 공간에서 거리를 만들어요. 같은 의미여도 cosine 0.85가 실질 상한이에요.\n\n그래서 **HyDE (Hypothetical Document Embeddings)**를 적용했어요. LLM이 각 티켓에서 '이 문서가 답할 수 있는 가상 질문'을 추출하게 해서, 검색 공간을 **질문↔질문 대칭**으로 만들어요.\n\n실제 A/B 실측 결과 **cosine +4.9pp 상승**을 확인했어요." },
+
+  { "type": "user", "text": "프롬프트 어떻게 만들었어요?" },
+  { "type": "assistant", "text": "**3라운드 튜닝**을 거쳤어요.\n\n- **v1**: 기본 JSON 4필드 → core_question이 서술문으로 나옴\n- **v2**: 의문문 강제 + FEEDBACK 명시 → PII '410호' 재등장\n- **v3 최종**: `\\d+호` 패턴 명시 제거 + 'FEEDBACK 어휘만 쓰기' 강화 → **6/6 테스트에서 PII 0건, 의문문 100%, FEEDBACK-only 준수 92%**\n\n실제 데이터 500건을 먼저 관찰한 뒤 규칙을 프롬프트에 반영하는 **데이터 드리븐 프롬프트 엔지니어링**이 핵심이었어요." },
+
+  { "type": "divider", "title": "방어 체계" },
+
+  { "type": "user", "text": "AI가 엉뚱한 답 내지 않을까 걱정인데요." },
+  { "type": "assistant", "text": "**3단 방어 체계**로 막아요.\n\n**1단: Qdrant score threshold (0.65)** — 벡터 유사도가 일정 이하면 후보에서 제외\n\n**2단: Reranker min-score (0.6)** — cross-encoder가 재검토해서 관련도 낮으면 제외\n\n**3단: LLM abstain 규칙** — 프롬프트에 \"관련 사례가 없으면 '관련 사례를 찾지 못했습니다'로만 답하라\" 명시\n\n실제로 \"고객이 극대노했어요\" 같은 **도메인 밖 질문**을 실측해보면 10건 중 0건이 threshold를 통과해서 정직하게 '관련 사례 없음'을 반환합니다." },
+
+  { "type": "user", "text": "중복 사례는요?" },
+  { "type": "assistant", "text": "데이터를 보면 **같은 장애가 4연속 티켓**으로 쌓인 경우가 있어요. 그대로 두면 Top 3가 모두 같은 장애만 보여주는 꼴이죠.\n\n단순 중복 제거는 위험해요 — 상담사가 찾는 정답이 그 중복 중 하나일 수도 있으니까요. 그래서 **MMR (Maximal Marginal Relevance)**을 적용했어요.\n\n**Top 1은 rerank 최고점을 그대로 보장**하고, Top 2·3만 다양성 가중치로 뽑아요. 밀려난 사례는 `similar_count` 메타로 보존해서 UI에서 '유사 +N건' 배지로 접근 가능하게 해뒀어요." },
+
+  { "type": "divider", "title": "유연한 아키텍처" },
+
+  { "type": "user", "text": "LLM 공급자를 바꾸고 싶으면요?" },
+  { "type": "assistant", "text": "**Provider-agnostic** 추상화를 해뒀어요.\n\n`TemplatizeService` 인터페이스를 두고 각 공급자별 구현체 (Groq / Claude / Gemini / OpenAI)를 bean name으로 등록해요. `application.yml`의 한 줄만 바꾸면 런타임 교체 가능해요:\n\n```yaml\nrag:\n  templatize:\n    provider: gemini\n```\n\n**벤더 락인 없이** Groq 무료로 프로토타입, 운영엔 GPT-4o-mini (~1,200원), 고품질 필요 시 Claude로 선택 가능해요.\n\nRAG 파이프라인 각 단계도 `application.yml` 한 줄로 ON/OFF 할 수 있어요 — Query Rewrite, Reranker, MMR 모두 독립 스위치예요." },
+
+  { "type": "divider", "title": "한계와 로드맵" },
+
+  { "type": "user", "text": "솔직히 한계는 뭐예요?" },
+  { "type": "assistant", "text": "**세 가지 정직한 한계**가 있어요.\n\n① **데이터 범위**: 운영팀 내부 티켓만 있어서 고객 민원은 커버 못 해요. 사내 고객 민원 DB와의 통합이 다음 과제예요.\n\n② **풀 HyDE 적재 미완**: Groq 무료 tier 토큰 한도 때문에 전체 티켓을 템플릿 컬렉션에 올리는 데 제약이 있어요. GPT-4o-mini 활용 시 1시간 내 완료 가능해요.\n\n③ **피드백 루프 미구현**: 아직 사용자 👍👎 데이터가 없어서 '얼마나 도움됐다'를 정량 측정 못 해요. 운영 시작하면 확보됩니다." },
+
+  { "type": "user", "text": "다음 단계는요?" },
+  { "type": "assistant", "text": "**이미 완료된 것들**이 꽤 있어요.\n\n✅ STT 파이프라인 — 통화 녹취 → Groq Whisper → 요약 → DB 자동 저장\n✅ 호텔 자동 매칭 — 4단계 폴백 전략\n✅ 증분 동기화 — 매일 03:00 자동 적재 스케줄러\n\n**앞으로 할 것들**\n- PMS call-monitoring 화면 완전 통합\n- 👍👎 피드백 누적 → 자동 재랭킹\n- 고객 민원 DB 통합 (intent 라우팅)\n- 카테고리·대시보드\n\n**비용**: 실서비스 운영은 월 2.5~7만원 수준 (Groq 유료 ~ Claude Haiku)." },
+
+  { "type": "divider", "title": "마무리" },
+
+  { "type": "assistant", "text": "들어주셔서 감사합니다.\n\n이 발표도 여러분이 심사 중이신 AI 시스템과 **같은 방식으로 동작**했어요. 미리 스크립트된 대화 + 중간에 실제 RAG 시스템 라이브 호출. **프로젝트의 가치관을 발표 형식에 투영**한 시도였어요.\n\n기억사무소는 과거의 모든 해결 경험을 기억합니다. 이제 질문받겠습니다." }
+]
+  </script>
+
+  <!-- ═════ 재생 엔진 ═════ -->
+  <script>
+    const script = JSON.parse(document.getElementById('scriptData').textContent);
+    const chat = document.getElementById('chat');
+    const chatInner = document.getElementById('chatInner');
+    const toc = document.getElementById('toc');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+
+    let cursor = 0;
+    let typing = false;
+
+    const AVATAR_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0 C12 6 18 12 24 12 C18 12 12 18 12 24 C12 18 6 12 0 12 C6 12 12 6 12 0 Z"/></svg>`;
+    const AGENT_NAME = '기억사무소';
+
+    // ─── TOC ───
+    function renderTOC() {
+      toc.innerHTML = '';
+      script.forEach((msg, i) => {
+        if (msg.type === 'divider') {
+          const el = document.createElement('div');
+          el.className = 'toc-item';
+          el.textContent = msg.title;
+          el.dataset.idx = i;
+          el.onclick = () => jumpTo(i);
+          toc.appendChild(el);
+        }
+      });
+    }
+
+    function updateProgress() {
+      const pct = (cursor / script.length) * 100;
+      progressBar.style.width = pct + '%';
+      progressText.textContent = `${cursor} / ${script.length}`;
+      let activeIdx = -1;
+      for (let i = Math.min(cursor, script.length - 1); i >= 0; i--) {
+        if (script[i].type === 'divider') { activeIdx = i; break; }
+      }
+      document.querySelectorAll('.toc-item').forEach(el => {
+        const idx = parseInt(el.dataset.idx);
+        el.classList.remove('active', 'completed');
+        if (idx === activeIdx) el.classList.add('active');
+        else if (idx < activeIdx) el.classList.add('completed');
+      });
+    }
+
+    async function advance() {
+      if (typing || cursor >= script.length) return;
+      const msg = script[cursor];
+      cursor++;
+      await renderMessage(msg);
+      updateProgress();
+      scrollToBottom();
+    }
+
+    function rewind() {
+      if (typing || cursor <= 0) return;
+      cursor--;
+      const last = chatInner.lastElementChild;
+      if (last) last.remove();
+      updateProgress();
+    }
+
+    function jumpTo(idx) {
+      if (typing) return;
+      chatInner.innerHTML = '';
+      cursor = 0;
+      while (cursor <= idx && cursor < script.length) {
+        renderMessageInstant(script[cursor]);
+        cursor++;
+      }
+      updateProgress();
+      scrollToBottom();
+    }
+
+    async function renderMessage(msg) {
+      switch (msg.type) {
+        case 'user':      appendUser(msg.text); break;
+        case 'assistant': await appendAssistantTyping(msg); break;
+        case 'divider':   appendDivider(msg.title); break;
+        case 'live':      await appendLive(msg); break;
+      }
+    }
+
+    function renderMessageInstant(msg) {
+      switch (msg.type) {
+        case 'user':      appendUser(msg.text); break;
+        case 'assistant': appendAssistant(msg); break;
+        case 'divider':   appendDivider(msg.title); break;
+        case 'live':      appendLivePlaceholder(msg); break;
+      }
+    }
+
+    function appendUser(text) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-user';
+      wrap.innerHTML = `<div class="msg-body">${formatText(text)}</div>`;
+      chatInner.appendChild(wrap);
+    }
+
+    function appendAssistant(msg) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-assistant';
+      wrap.innerHTML = `
+        <div class="msg-header"><span class="avatar">${AVATAR_SVG}</span>${AGENT_NAME}</div>
+        <div class="msg-body">${formatText(msg.text)}</div>
+      `;
+      chatInner.appendChild(wrap);
+      if (msg.image) appendExtra(wrap, 'img', msg.image);
+    }
+
+    async function appendAssistantTyping(msg) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-assistant';
+      wrap.innerHTML = `
+        <div class="msg-header"><span class="avatar">${AVATAR_SVG}</span>${AGENT_NAME}</div>
+        <div class="msg-body"><span class="typing-cursor"></span></div>
+      `;
+      chatInner.appendChild(wrap);
+      const body = wrap.querySelector('.msg-body');
+      await typeOut(body, msg.text);
+      if (msg.image) appendExtra(wrap, 'img', msg.image);
+    }
+
+    function appendExtra(wrap, kind, data) {
+      const body = wrap.querySelector('.msg-body');
+      if (kind === 'img') {
+        const el = document.createElement('img');
+        el.src = data; el.className = 'msg-image';
+        body.appendChild(el);
+      }
+    }
+
+    function typeOut(el, text) {
+      return new Promise(resolve => {
+        typing = true;
+        const speed = 12;
+        let i = 0;
+        const len = text.length;
+        (function tick() {
+          if (i >= len) {
+            el.innerHTML = formatText(text);
+            typing = false;
+            resolve();
+            return;
+          }
+          el.innerHTML = formatText(text.slice(0, i + 1)) + '<span class="typing-cursor"></span>';
+          i++;
+          scrollToBottom();
+          setTimeout(tick, speed);
+        })();
+      });
+    }
+
+    function formatText(text) {
+      return text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre class="msg-code">${code.trim()}</pre>`)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+?)`/g, '<code>$1</code>')
+        .replace(/^- (.+)$/gm, '•&nbsp;&nbsp;$1')
+        .replace(/\n/g, '<br>');
+    }
+
+    function appendDivider(title) {
+      const el = document.createElement('div');
+      el.className = 'divider';
+      el.innerHTML = `<span>${title}</span>`;
+      chatInner.appendChild(el);
+    }
+
+    async function appendLive(msg) {
+      const wrap = document.createElement('div');
+      wrap.className = 'live-block';
+      wrap.innerHTML = `
+        <span class="live-badge">LIVE</span>
+        <div class="live-question">${escapeHtml(msg.question)}</div>
+        <div class="live-answer loading">검색 중...</div>
+        <div class="live-sources"></div>
+      `;
+      chatInner.appendChild(wrap);
+      scrollToBottom();
+      typing = true;
+      try {
+        const res = await fetch('/api/rag/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify({ question: msg.question, mode: msg.mode || 'default' })
+        });
+        const data = await res.json();
+        renderLiveResult(wrap, data);
+      } catch (e) {
+        wrap.querySelector('.live-answer').innerHTML = '❌ 네트워크 오류: ' + escapeHtml(e.message);
+      } finally {
+        typing = false;
+      }
+    }
+
+    function renderLiveResult(wrap, data) {
+      const ans = wrap.querySelector('.live-answer');
+      ans.classList.remove('loading');
+      if (!data.answer) {
+        ans.innerHTML = '⚠️ ' + escapeHtml(data.message || '응답을 받지 못했습니다');
+        return;
+      }
+      ans.innerHTML = formatText(data.answer);
+      const srcs = (data.sources || []).slice(0, 3);
+      if (!srcs.length) return;
+      wrap.querySelector('.live-sources').innerHTML =
+        `<div class="live-sources-title">참고한 유사 사례 ${srcs.length}건 · ${data.elapsed_ms || 0}ms</div>` +
+        srcs.map(s => {
+          const cat = [s.system_nm, s.system_tp_dtl_nm].filter(Boolean).join(' / ');
+          return `<div class="live-source">
+            <div class="live-source-meta">
+              유사도 ${(s.score*100).toFixed(0)}%
+              · rerank ${((s.rerank_score||0)*100).toFixed(0)}%
+              ${cat ? '· ' + escapeHtml(cat) : ''}
+              · #${s.seq_no}
+            </div>
+            ${escapeHtml((s.report || '').slice(0, 200))}
+          </div>`;
+        }).join('');
+    }
+
+    function appendLivePlaceholder(msg) {
+      const wrap = document.createElement('div');
+      wrap.className = 'live-block';
+      wrap.innerHTML = `
+        <span class="live-badge">LIVE</span>
+        <div class="live-question">${escapeHtml(msg.question)}</div>
+        <div class="live-answer">대기 중 — <kbd>R</kbd> 눌러서 실행</div>
+      `;
+      chatInner.appendChild(wrap);
+    }
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function scrollToBottom() {
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.code === 'ArrowRight') { e.preventDefault(); advance(); }
+      else if (e.code === 'ArrowLeft') { e.preventDefault(); rewind(); }
+      else if (e.key === 'r' || e.key === 'R') {
+        const liveBlocks = chatInner.querySelectorAll('.live-block');
+        const lastBlock = liveBlocks[liveBlocks.length - 1];
+        if (!lastBlock) return;
+        const liveMsgs = script.filter(m => m.type === 'live');
+        const liveIdx = Array.from(liveBlocks).indexOf(lastBlock);
+        const targetMsg = liveMsgs[liveIdx];
+        if (!targetMsg) return;
+        lastBlock.remove();
+        appendLive(targetMsg);
+      }
+      else if (e.code === 'Home') { jumpTo(0); }
+    });
+
+    renderTOC();
+    updateProgress();
+  </script>
+</body>
+</html>

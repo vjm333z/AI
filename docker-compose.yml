@@ -2,7 +2,6 @@
 # 시크릿은 .env 파일에서 로드. .env.example 참고.
 #
 # Python 서비스(reranker + STT)는 단일 컨테이너 python-svc 로 통합 (포트 8000).
-# CALL_QUEUE / mariadb-local 은 폐기됐고 STT 결과는 운영 PMS DB의 AIA_CALL_* 테이블에 저장.
 services:
   qdrant:
     image: qdrant/qdrant:v1.17.1
@@ -38,11 +37,11 @@ services:
       GROQ_LLM_API_KEY: ${GROQ_LLM_API_KEY:-${GROQ_API_KEY}}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
-      # AIA DB (운영 PMS DB)
-      DB_HOST: ${STT_DB_HOST:-211.34.228.191}
-      DB_PORT: ${STT_DB_PORT:-3336}
-      DB_USER: ${STT_DB_USER:-peh0322}
-      DB_PASSWORD: ${STT_DB_PASSWORD:-dmsWkd0819!@#}
+      # AIA DB (운영 PMS DB) — 모든 값은 .env에서 주입
+      DB_HOST: ${STT_DB_HOST}
+      DB_PORT: ${STT_DB_PORT:-3306}
+      DB_USER: ${STT_DB_USER}
+      DB_PASSWORD: ${STT_DB_PASSWORD}
       DB_NAME: ${STT_DB_NAME:-PMS}
     volumes:
       - reranker_cache:/root/.cache/huggingface

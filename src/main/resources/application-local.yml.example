@@ -1,0 +1,29 @@
+# IntelliJ 로컬 개발용 시크릿 오버라이드
+# 이 파일을 application-local.yml로 복사하고 값을 채우세요.
+#   cp src/main/resources/application-local.yml.example src/main/resources/application-local.yml
+#
+# IntelliJ Run Configuration에서 활성화:
+#   Environment variables: SPRING_PROFILES_ACTIVE=local
+
+spring:
+  datasource:
+    url: jdbc:mariadb://211.34.228.178:3336/PMS
+    username: DEV
+    password: 여기에_DB_비밀번호
+
+groq:
+  api-key: 여기에_Groq_API_키
+
+claude:
+  api-key: 여기에_Claude_API_키
+
+# 로컬에서는 localhost 사용 (docker-compose로 인프라 띄운 상태)
+ollama:
+  url: http://localhost:11434
+
+qdrant:
+  url: http://localhost:6333
+
+rag:
+  reranker:
+    url: http://localhost:8000

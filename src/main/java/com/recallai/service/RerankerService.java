@@ -73,7 +73,6 @@ public class RerankerService {
         for (Map<String, Object> c : similarCases) {
             Map<String, Object> payload = (Map<String, Object>) c.get("payload");
             // 임베딩 입력(toEmbeddingText)과 일치시킴 — 현재는 REPORT만 사용.
-            // TITLE은 payload에서 완전히 제거됨(2026-04-20).
             String report = payload.get("report") != null ? String.valueOf(payload.get("report")) : "";
             // HTML 태그/연속 공백 정리 (payload가 이미 cleanDisplay 적용됐더라도 방어적으로)
             documents.add(report.replaceAll("<[^>]*>", " ").replaceAll("\\s+", " ").trim());
