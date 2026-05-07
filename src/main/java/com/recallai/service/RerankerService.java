@@ -2,6 +2,8 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.RagProperties;
+import lombok.RequiredArgsConstructor;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -11,7 +13,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -23,21 +24,19 @@ import java.util.*;
  * rag.reranker.enabled=true 인 경우 RagService에서 사용.
  */
 @Service
+@RequiredArgsConstructor
 public class RerankerService {
 
     private static final Logger log = LoggerFactory.getLogger(RerankerService.class);
 
-    @Value("${rag.reranker.url}")
-    private String rerankerUrl;
-
-    @Value("${rag.reranker.timeout-ms:5000}")
-    private int timeoutMs;
+    private final RagProperties ragProps;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CloseableHttpClient httpClient;
 
     @PostConstruct
     private void init() {
+        int timeoutMs = ragProps.getReranker().getTimeoutMs();
         RequestConfig config = RequestConfig.custom()
                 .setConnectTimeout(timeoutMs)
                 .setSocketTimeout(timeoutMs)
@@ -83,7 +82,7 @@ public class RerankerService {
         body.put("documents", documents);
         body.put("top_k", topK);
 
-        HttpPost post = new HttpPost(rerankerUrl + "/rerank");
+        HttpPost post = new HttpPost(ragProps.getReranker().getUrl() + "/rerank");
         post.setHeader("Content-Type", "application/json");
         byte[] jsonBytes = objectMapper.writeValueAsBytes(body);
         ByteArrayEntity entity = new ByteArrayEntity(jsonBytes);

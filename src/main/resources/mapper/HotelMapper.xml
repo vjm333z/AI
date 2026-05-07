@@ -6,20 +6,20 @@
 
     <select id="selectAllProperties" resultType="com.recallai.dto.HotelDto">
         SELECT
-            PROP_CD      as propCd,
-            PROP_SHRT_NM as propShrtNm,
-            PROP_FULL_NM as propFullNm
+            PROP_CD,
+            PROP_SHRT_NM,
+            PROP_FULL_NM
         FROM PMS_PROPERTY
         ORDER BY PROP_CD
     </select>
 
     <select id="selectAllComplexes" resultType="com.recallai.dto.ComplexDto">
         SELECT
-            PROP_CD                          as propCd,
-            CMPX_CD                          as cmpxCd,
-            CMPX_NM                          as cmpxNm,
-            CMPX_TP                          as cmpxTp,
-            DECRYPT_AES256(CMPX_REPR_TEL)    as cmpxReprTel
+            PROP_CD,
+            CMPX_CD,
+            CMPX_NM,
+            CMPX_TP,
+            DECRYPT_AES256(CMPX_REPR_TEL) AS CMPX_REPR_TEL
         FROM PMS_COMPLEX
         ORDER BY PROP_CD, CMPX_CD
     </select>

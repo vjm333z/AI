@@ -1,12 +1,14 @@
 package com.recallai.service;
 
+import com.recallai.config.RagProperties;
 import com.recallai.dto.HotelDto;
 import com.recallai.dto.KokCallMntrDto;
+import com.recallai.model.PointType;
+import com.recallai.model.SearchMode;
 import com.recallai.repository.KokCallMntrMapper;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -29,83 +31,28 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class RagService {
 
     private static final Logger log = LoggerFactory.getLogger(RagService.class);
 
-    @Autowired
-    private KokCallMntrMapper mapper;
-
-    @Autowired
-    private OllamaService ollamaService;
-
-    @Autowired
-    private QdrantService qdrantService;
-
-    @Autowired
-    private GroqService groqService;
-
-    @Autowired
-    private OpenAiService openAiService;
-
-    @Autowired
-    private RerankerService rerankerService;
-
-    @Autowired
-    private QueryRewriteService queryRewriteService;
-
-    @Autowired
-    private IndexFailureTracker failureTracker;
-
-    @Autowired
-    private HotelCacheService hotelCacheService;
+    private final KokCallMntrMapper mapper;
+    private final OllamaService ollamaService;
+    private final QdrantService qdrantService;
+    private final GroqService groqService;
+    private final OpenAiService openAiService;
+    private final RerankerService rerankerService;
+    private final QueryRewriteService queryRewriteService;
+    private final IndexFailureTracker failureTracker;
+    private final HotelCacheService hotelCacheService;
+    private final RagProperties props;
 
     /**
      * 등록된 모든 TemplatizeService 구현체.
      * Spring이 bean name → 구현체 Map으로 자동 주입 (예: "groq" → GroqService).
      * resolveTemplatizer()에서 provider 설정값으로 골라 씀.
      */
-    @Autowired
-    private Map<String, TemplatizeService> templatizers;
-
-    @Value("${rag.templatize.provider:groq}")
-    private String templatizeProvider;
-
-    @Value("${rag.search.top-k:10}")
-    private int searchTopK;
-
-    @Value("${rag.search.final-top-k:3}")
-    private int finalTopK;
-
-    @Value("${rag.search.score-threshold:0.5}")
-    private double scoreThreshold;
-
-    @Value("${rag.search.faq-top-k:3}")
-    private int faqTopK;
-
-    @Value("${rag.search.faq-score-threshold:0.60}")
-    private double faqScoreThreshold;
-
-    @Value("${rag.reranker.enabled:false}")
-    private boolean rerankerEnabled;
-
-    @Value("${rag.reranker.min-score:0.0}")
-    private double rerankMinScore;
-
-    @Value("${rag.dedup.enabled:false}")
-    private boolean dedupEnabled;
-
-    @Value("${rag.dedup.jaccard-threshold:0.7}")
-    private double dedupJaccardThreshold;
-
-    @Value("${rag.dedup.lambda:0.7}")
-    private double dedupLambda;
-
-    @Value("${rag.query-rewrite.enabled:false}")
-    private boolean queryRewriteEnabled;
-
-    @Value("${rag.data-dir:.}")
-    private String dataDir;
+    private final Map<String, TemplatizeService> templatizers;
 
     private static final String SYNC_FILE = "last_sync.txt";
     private static final String SYNC_FILE_DEFAULT = "2026-04-15";
@@ -164,7 +111,7 @@ public class RagService {
     //   MMR로 밀려난 유사 사례 수는 payload에 similar_count로 기록 → UI에서 "비슷한 N건 더" 힌트 가능.
     // ============================================================
     private List<Map<String, Object>> applyMMR(List<Map<String, Object>> candidates, int topK) {
-        if (!dedupEnabled || candidates == null || candidates.size() <= topK) {
+        if (!props.getDedup().isEnabled() || candidates == null || candidates.size() <= topK) {
             return candidates == null ? new ArrayList<>()
                     : candidates.stream().limit(topK).toList();
         }
@@ -187,7 +134,7 @@ public class RagService {
                     double sim = jaccardSimilarity(candText, getMmrText(sel));
                     if (sim > maxSim) maxSim = sim;
                 }
-                double mmrScore = dedupLambda * relevance - (1 - dedupLambda) * maxSim;
+                double mmrScore = props.getDedup().getLambda() * relevance - (1 - props.getDedup().getLambda()) * maxSim;
                 if (mmrScore > bestScore) { bestScore = mmrScore; bestIdx = i; }
             }
             if (bestIdx < 0) break;
@@ -199,7 +146,7 @@ public class RagService {
             String selText = getMmrText(sel);
             int cnt = 0;
             for (Map<String, Object> rem : remaining) {
-                if (jaccardSimilarity(selText, getMmrText(rem)) >= dedupJaccardThreshold) cnt++;
+                if (jaccardSimilarity(selText, getMmrText(rem)) >= props.getDedup().getJaccardThreshold()) cnt++;
             }
             sel.put("similar_count", cnt);
         }
@@ -270,38 +217,38 @@ public class RagService {
     /** Reranker 재정렬 + MMR 다양성 선택 — ask()와 searchOnly() 공통 로직. */
     private List<Map<String, Object>> rankAndDiversify(String question,
                                                         List<Map<String, Object>> filteredCases) {
-        if (rerankerEnabled && !filteredCases.isEmpty()) {
+        if (props.getReranker().isEnabled() && !filteredCases.isEmpty()) {
             try {
-                int rerankTopK = dedupEnabled ? filteredCases.size() : finalTopK;
+                int rerankTopK = props.getDedup().isEnabled() ? filteredCases.size() : props.getSearch().getFinalTopK();
                 List<Map<String, Object>> reranked = rerankerService.rerank(question, filteredCases, rerankTopK);
                 List<Map<String, Object>> afterMin = reranked.stream()
-                        .filter(c -> c.get("rerank_score") instanceof Number n && n.doubleValue() >= rerankMinScore)
+                        .filter(c -> c.get("rerank_score") instanceof Number n && n.doubleValue() >= props.getReranker().getMinScore())
                         .toList();
                 log.info("Rerank {}건 → min-score({}) 컷 {}건 → MMR({}) 최종 {}건",
-                        reranked.size(), rerankMinScore, afterMin.size(),
-                        dedupEnabled ? "ON" : "OFF", finalTopK);
-                return applyMMR(afterMin, finalTopK);
+                        reranked.size(), props.getReranker().getMinScore(), afterMin.size(),
+                        props.getDedup().isEnabled() ? "ON" : "OFF", props.getSearch().getFinalTopK());
+                return applyMMR(afterMin, props.getSearch().getFinalTopK());
             } catch (Exception e) {
                 log.warn("Reranker 호출 실패, Qdrant 순위로 폴백: {}", e.getMessage());
-                return applyMMR(filteredCases, finalTopK);
+                return applyMMR(filteredCases, props.getSearch().getFinalTopK());
             }
         }
-        return applyMMR(filteredCases, finalTopK);
+        return applyMMR(filteredCases, props.getSearch().getFinalTopK());
     }
 
     /** rag.templatize.provider 설정값에 따라 알맞은 TemplatizeService 선택. */
     private TemplatizeService resolveTemplatizer() {
-        TemplatizeService svc = templatizers.get(templatizeProvider);
+        TemplatizeService svc = templatizers.get(props.getTemplatize().getProvider());
         if (svc == null) {
             throw new IllegalStateException(
-                    "Unknown templatize provider='" + templatizeProvider + "'. 사용 가능: " + templatizers.keySet());
+                    "Unknown templatize provider='" + props.getTemplatize().getProvider() + "'. 사용 가능: " + templatizers.keySet());
         }
         return svc;
     }
 
     /** HyDE 템플릿 적재 — provider/collection은 application.yml 기본값. limit=0 이면 전체. */
     public String indexAllTemplated(int limit) throws Exception {
-        return indexAllTemplatedWith(templatizeProvider, qdrantService.getTemplatedCollection(), limit);
+        return indexAllTemplatedWith(props.getTemplatize().getProvider(), qdrantService.getTemplatedCollection(), limit);
     }
 
     public String indexAllTemplatedWith(String provider, String collectionName, int limit) throws Exception {
@@ -490,25 +437,25 @@ public class RagService {
         String collectionName = resolveCollection(mode);
 
         // 1. (옵션) 질문 확장 — 검색 품질 향상
-        String searchQuery = queryRewriteEnabled ? queryRewriteService.rewrite(question) : question;
+        String searchQuery = props.getQueryRewrite().isEnabled() ? queryRewriteService.rewrite(question) : question;
 
         // 2. 질문 임베딩
         List<Double> queryVector = ollamaService.embed(searchQuery);
 
         // 3-FAQ. FAQ 검색 (type=FAQ 필터, propCd 무관, reranker 미적용)
-        List<Map<String, Object>> faqRaw = qdrantService.searchIn(collectionName, queryVector, faqTopK, null, "FAQ");
+        List<Map<String, Object>> faqRaw = qdrantService.searchIn(collectionName, queryVector, props.getSearch().getFaqTopK(), null, PointType.FAQ.name());
         List<Map<String, Object>> faqResults = faqRaw.stream()
-                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= faqScoreThreshold)
+                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= props.getSearch().getFaqScoreThreshold())
                 .toList();
         log.info("FAQ 검색 결과: {}건 (threshold 후: {}건)", faqRaw.size(), faqResults.size());
 
-        // 3. Qdrant에서 REAL Top N 검색 (reranker가 있으면 넉넉히, 없으면 finalTopK만)
-        int fetchK = rerankerEnabled ? searchTopK : finalTopK;
-        List<Map<String, Object>> similarCases = qdrantService.searchIn(collectionName, queryVector, fetchK, propCd, "REAL");
+        // 3. Qdrant에서 REAL Top N 검색 (reranker가 있으면 넉넉히, 없으면 props.getSearch().getFinalTopK()만)
+        int fetchK = props.getReranker().isEnabled() ? props.getSearch().getTopK() : props.getSearch().getFinalTopK();
+        List<Map<String, Object>> similarCases = qdrantService.searchIn(collectionName, queryVector, fetchK, propCd, PointType.REAL.name());
 
         // 4. 유사도 점수 필터
         List<Map<String, Object>> filteredCases = similarCases.stream()
-                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= scoreThreshold)
+                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= props.getSearch().getScoreThreshold())
                 .toList();
 
         log.info("유사 사례 검색 결과: {}건", similarCases.size());
@@ -544,10 +491,12 @@ public class RagService {
         return response;
     }
 
-    /** "templated" → inquiry_templated, 그 외 → default */
+    /** SearchMode → 컬렉션 이름. TEMPLATED → inquiry_templated, DEFAULT(미지원 값 폴백) → inquiry */
     private String resolveCollection(String mode) {
-        if ("templated".equalsIgnoreCase(mode)) return qdrantService.getTemplatedCollection();
-        return qdrantService.getDefaultCollection();
+        return switch (SearchMode.fromString(mode)) {
+            case TEMPLATED -> qdrantService.getTemplatedCollection();
+            case DEFAULT -> qdrantService.getDefaultCollection();
+        };
     }
 
     public Map<String, Object> searchOnly(String question, String propCd) throws Exception {
@@ -557,12 +506,12 @@ public class RagService {
     /** 디버그·튜닝용: LLM 거치지 않고 Qdrant + (옵션) Reranker 결과만 반환 */
     public Map<String, Object> searchOnly(String question, String propCd, String mode) throws Exception {
         String collectionName = resolveCollection(mode);
-        String searchQuery = queryRewriteEnabled ? queryRewriteService.rewrite(question) : question;
+        String searchQuery = props.getQueryRewrite().isEnabled() ? queryRewriteService.rewrite(question) : question;
         List<Double> queryVector = ollamaService.embed(searchQuery);
-        int fetchK = rerankerEnabled ? searchTopK : finalTopK;
-        List<Map<String, Object>> similarCases = qdrantService.searchIn(collectionName, queryVector, fetchK, propCd, "REAL");
+        int fetchK = props.getReranker().isEnabled() ? props.getSearch().getTopK() : props.getSearch().getFinalTopK();
+        List<Map<String, Object>> similarCases = qdrantService.searchIn(collectionName, queryVector, fetchK, propCd, PointType.REAL.name());
         List<Map<String, Object>> filteredCases = similarCases.stream()
-                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= scoreThreshold)
+                .filter(c -> c.get("score") instanceof Number n && n.doubleValue() >= props.getSearch().getScoreThreshold())
                 .toList();
 
         List<Map<String, Object>> finalCases = rankAndDiversify(question, filteredCases);
@@ -584,7 +533,7 @@ public class RagService {
         List<Map<String, Object>> all = qdrantService.scrollAllPayloads().stream()
                 .filter(p -> {
                     Map<String, Object> payload = (Map<String, Object>) p.get("payload");
-                    return payload == null || !"FAQ".equals(payload.get("type"));
+                    return payload == null || !PointType.FAQ.name().equals(payload.get("type"));
                 })
                 .collect(Collectors.toList());
         if (all.isEmpty()) {
@@ -734,7 +683,7 @@ public class RagService {
 
     private String readLastSyncDt() {
         try {
-            File file = Paths.get(dataDir, SYNC_FILE).toFile();
+            File file = Paths.get(props.getDataDir(), SYNC_FILE).toFile();
             if (!file.exists()) return SYNC_FILE_DEFAULT;
             var content = Files.readString(file.toPath()).trim();
             if (!DATE_PATTERN.matcher(content).matches()) {
@@ -751,8 +700,8 @@ public class RagService {
 
     // 원자적 쓰기: tmp 파일에 먼저 쓴 뒤 move. 중간 크래시에도 기존 파일 보존.
     private void saveLastSyncDt(String dt) {
-        Path target = Paths.get(dataDir, SYNC_FILE);
-        Path tmp = Paths.get(dataDir, SYNC_FILE + ".tmp");
+        Path target = Paths.get(props.getDataDir(), SYNC_FILE);
+        Path tmp = Paths.get(props.getDataDir(), SYNC_FILE + ".tmp");
         try {
             Files.writeString(tmp, dt);
             try {

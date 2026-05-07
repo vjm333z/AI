@@ -1,10 +1,11 @@
 package com.recallai.service;
 
+import com.recallai.config.RagProperties;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -33,14 +34,14 @@ import java.util.stream.Collectors;
  * intrinsic lock으로 직렬화한다 (적재 루프는 단일 스레드지만 안전 차원).
  */
 @Service
+@RequiredArgsConstructor
 public class IndexFailureTracker {
 
     private static final Logger log = LoggerFactory.getLogger(IndexFailureTracker.class);
     private static final Marker INDEX_FAIL = MarkerFactory.getMarker("INDEX_FAIL");
     private static final String FILE = "failed_index.txt";
 
-    @Value("${rag.data-dir:.}")
-    private String dataDir;
+    private final RagProperties props;
 
     private final Object lock = new Object();
 
@@ -50,7 +51,7 @@ public class IndexFailureTracker {
         String line = seqNo + "|" + Instant.now().toString() + "|" + sanitize(reason) + "\n";
         synchronized (lock) {
             try {
-                Files.write(Paths.get(dataDir, FILE), line.getBytes(StandardCharsets.UTF_8),
+                Files.write(Paths.get(props.getDataDir(), FILE), line.getBytes(StandardCharsets.UTF_8),
                         StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             } catch (IOException e) {
                 log.warn("실패 장부 기록 실패 seq_no={}: {}", seqNo, e.getMessage());
@@ -63,7 +64,7 @@ public class IndexFailureTracker {
     /** 전체 실패 엔트리 읽기 (seq_no, timestamp, reason). */
     public List<Map<String, Object>> readAll() {
         synchronized (lock) {
-            Path path = Paths.get(dataDir, FILE);
+            Path path = Paths.get(props.getDataDir(), FILE);
             if (!Files.exists(path)) return new ArrayList<>();
             try {
                 List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
@@ -100,7 +101,7 @@ public class IndexFailureTracker {
         if (successSeqs == null || successSeqs.isEmpty()) return;
         Set<Integer> done = new HashSet<>(successSeqs);
         synchronized (lock) {
-            Path path = Paths.get(dataDir, FILE);
+            Path path = Paths.get(props.getDataDir(), FILE);
             if (!Files.exists(path)) return;
             try {
                 List<String> remain = Files.readAllLines(path, StandardCharsets.UTF_8).stream()

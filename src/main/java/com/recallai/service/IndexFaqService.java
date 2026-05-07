@@ -2,10 +2,11 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.QdrantProperties;
+import com.recallai.model.PointType;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ import java.io.InputStream;
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class IndexFaqService {
 
     private static final Logger log = LoggerFactory.getLogger(IndexFaqService.class);
@@ -20,14 +22,9 @@ public class IndexFaqService {
     // FAQ Qdrant ID = FAQ_ID_OFFSET + numeric part of faq_id ("faq_001" → 9_000_001)
     private static final long FAQ_ID_OFFSET = 9_000_000L;
 
-    @Autowired
-    private OllamaService ollamaService;
-
-    @Autowired
-    private QdrantService qdrantService;
-
-    @Value("${qdrant.collection}")
-    private String collection;
+    private final OllamaService ollamaService;
+    private final QdrantService qdrantService;
+    private final QdrantProperties qdrantProps;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -36,7 +33,7 @@ public class IndexFaqService {
      * FAQ 적재 전 1회 실행하거나 /api/rag/index/set-types 로 수동 실행.
      */
     public String setTypesOnExisting() throws Exception {
-        qdrantService.setTypeOnExisting(collection);
+        qdrantService.setTypeOnExisting(qdrantProps.getCollection());
         return "기존 포인트 type=REAL 설정 완료";
     }
 
@@ -60,13 +57,13 @@ public class IndexFaqService {
                 List<Double> vector = ollamaService.embed(question);
 
                 Map<String, Object> payload = new LinkedHashMap<>();
-                payload.put("type", "FAQ");
+                payload.put("type", PointType.FAQ.name());
                 payload.put("faq_id", faqId);
                 payload.put("category", category);
                 payload.put("question", question);
                 payload.put("answer", answer);
 
-                qdrantService.upsertRawPoint(collection, pointId, vector, payload);
+                qdrantService.upsertRawPoint(qdrantProps.getCollection(), pointId, vector, payload);
                 log.debug("FAQ upsert 완료: {} ({})", faqId, question);
                 success++;
             } catch (Exception e) {

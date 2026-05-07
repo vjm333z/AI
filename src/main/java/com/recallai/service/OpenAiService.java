@@ -1,7 +1,9 @@
 package com.recallai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.OpenAiProperties;
 import com.recallai.util.TextSanitizer;
+import lombok.RequiredArgsConstructor;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -11,7 +13,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -24,21 +25,12 @@ import java.util.Map;
  * RagService.ask() 가 Groq 호출 실패 시 본 서비스를 호출.
  */
 @Service
+@RequiredArgsConstructor
 public class OpenAiService {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiService.class);
 
-    @Value("${openai.api-key}")
-    private String apiKey;
-
-    @Value("${openai.model:gpt-4o-mini}")
-    private String model;
-
-    @Value("${openai.url:https://api.openai.com/v1/chat/completions}")
-    private String openAiUrl;
-
-    @Value("${openai.timeout-ms:30000}")
-    private int timeoutMs;
+    private final OpenAiProperties props;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CloseableHttpClient httpClient;
@@ -47,7 +39,7 @@ public class OpenAiService {
     private void init() {
         var config = RequestConfig.custom()
                 .setConnectTimeout(5000)
-                .setSocketTimeout(timeoutMs)
+                .setSocketTimeout(props.getTimeoutMs())
                 .build();
         this.httpClient = HttpClients.custom().setDefaultRequestConfig(config).build();
     }
@@ -98,12 +90,12 @@ public class OpenAiService {
         }
         String userPrompt = context + "=== 현재 문의 ===\n" + question;
 
-        var post = new HttpPost(openAiUrl);
-        post.setHeader("Authorization", "Bearer " + apiKey);
+        var post = new HttpPost(props.getUrl());
+        post.setHeader("Authorization", "Bearer " + props.getApiKey());
         post.setHeader("Content-Type", "application/json");
 
         var body = Map.of(
-            "model", model,
+            "model", props.getModel(),
             "messages", List.of(
                 Map.of("role", "system", "content", SYSTEM_PROMPT),
                 Map.of("role", "user",   "content", userPrompt)

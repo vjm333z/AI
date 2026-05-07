@@ -2,9 +2,10 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.GroqProperties;
 import com.recallai.util.TextSanitizer;
+import lombok.RequiredArgsConstructor;
 import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -12,7 +13,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -27,6 +27,7 @@ import java.util.Map;
  * ask() / proposeCategories()는 templatize와 별개 용도로 유지.
  */
 @Service("groq")
+@RequiredArgsConstructor
 public class GroqService implements TemplatizeService {
 
     @Override
@@ -34,17 +35,7 @@ public class GroqService implements TemplatizeService {
 
     private static final Logger log = LoggerFactory.getLogger(GroqService.class);
 
-    @Value("${groq.api-key}")
-    private String apiKey;
-
-    @Value("${groq.model}")
-    private String model;
-
-    @Value("${groq.url}")
-    private String groqUrl;
-
-    @Value("${groq.timeout-ms:30000}")
-    private int timeoutMs;
+    private final GroqProperties props;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CloseableHttpClient httpClient;
@@ -53,7 +44,7 @@ public class GroqService implements TemplatizeService {
     private void init() {
         var config = RequestConfig.custom()
                 .setConnectTimeout(3000)
-                .setSocketTimeout(timeoutMs)
+                .setSocketTimeout(props.getTimeoutMs())
                 .build();
         this.httpClient = HttpClients.custom().setDefaultRequestConfig(config).build();
     }
@@ -106,12 +97,12 @@ public class GroqService implements TemplatizeService {
 
         String userPrompt = context + "=== 현재 문의 ===\n" + question;
 
-        var post = new HttpPost(groqUrl);
-        post.setHeader("Authorization", "Bearer " + apiKey);
+        var post = new HttpPost(props.getUrl());
+        post.setHeader("Authorization", "Bearer " + props.getApiKey());
         post.setHeader("Content-Type", "application/json");
 
         var body = Map.of(
-            "model", model,
+            "model", props.getModel(),
             "messages", buildMessages(systemPrompt, userPrompt),
             "max_tokens", 500
         );
@@ -177,12 +168,12 @@ public class GroqService implements TemplatizeService {
                       .append("    내용: ").append(s.getOrDefault("report", "")).append("\n\n");
         }
 
-        var post = new HttpPost(groqUrl);
-        post.setHeader("Authorization", "Bearer " + apiKey);
+        var post = new HttpPost(props.getUrl());
+        post.setHeader("Authorization", "Bearer " + props.getApiKey());
         post.setHeader("Content-Type", "application/json");
 
         var body = Map.of(
-            "model", model,
+            "model", props.getModel(),
             "messages", buildMessages(systemPrompt, userPrompt.toString()),
             "max_tokens", 4000,
             "response_format", Map.of("type", "json_object")
@@ -262,15 +253,15 @@ public class GroqService implements TemplatizeService {
                        + "FEEDBACK: " + (feedback == null ? "" : feedback);
 
         var body = Map.of(
-            "model", model,
+            "model", props.getModel(),
             "messages", buildMessages(TEMPLATIZE_SYSTEM_PROMPT, userMsg),
             "max_tokens", 500,
             "temperature", 0.2,
             "response_format", Map.of("type", "json_object")
         );
 
-        var post = new HttpPost(groqUrl);
-        post.setHeader("Authorization", "Bearer " + apiKey);
+        var post = new HttpPost(props.getUrl());
+        post.setHeader("Authorization", "Bearer " + props.getApiKey());
         post.setHeader("Content-Type", "application/json");
 
         try {

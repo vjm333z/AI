@@ -1,6 +1,9 @@
 package com.recallai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.GroqProperties;
+import com.recallai.config.RagProperties;
+import lombok.RequiredArgsConstructor;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
@@ -9,7 +12,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -23,27 +25,20 @@ import java.util.Map;
  * 실패 시 원문 질문을 그대로 반환 (서비스 중단 방지).
  */
 @Service
+@RequiredArgsConstructor
 public class QueryRewriteService {
 
     private static final Logger log = LoggerFactory.getLogger(QueryRewriteService.class);
 
-    @Value("${groq.api-key}")
-    private String apiKey;
-
-    @Value("${groq.model}")
-    private String model;
-
-    @Value("${groq.url}")
-    private String groqUrl;
-
-    @Value("${rag.query-rewrite.timeout-ms:3000}")
-    private int timeoutMs;
+    private final GroqProperties groqProps;
+    private final RagProperties ragProps;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CloseableHttpClient httpClient;
 
     @PostConstruct
     private void init() {
+        int timeoutMs = ragProps.getQueryRewrite().getTimeoutMs();
         var config = RequestConfig.custom()
                 .setConnectTimeout(timeoutMs)
                 .setSocketTimeout(timeoutMs)
@@ -82,12 +77,12 @@ public class QueryRewriteService {
         }
 
         try {
-            var post = new HttpPost(groqUrl);
-            post.setHeader("Authorization", "Bearer " + apiKey);
+            var post = new HttpPost(groqProps.getUrl());
+            post.setHeader("Authorization", "Bearer " + groqProps.getApiKey());
             post.setHeader("Content-Type", "application/json");
 
             var body = Map.of(
-                "model", model,
+                "model", groqProps.getModel(),
                 "messages", List.of(
                     Map.of("role", "system", "content", SYSTEM_PROMPT),
                     Map.of("role", "user", "content", "원본 질문: " + original)

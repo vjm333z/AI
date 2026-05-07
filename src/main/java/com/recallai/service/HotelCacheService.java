@@ -2,13 +2,13 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.RagProperties;
 import com.recallai.dto.ComplexDto;
 import com.recallai.dto.HotelDto;
 import com.recallai.repository.HotelMapper;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -21,15 +21,13 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class HotelCacheService {
 
     private static final Logger log = LoggerFactory.getLogger(HotelCacheService.class);
 
-    @Autowired
-    private HotelMapper hotelMapper;
-
-    @Value("${rag.data-dir:.}")
-    private String dataDir;
+    private final HotelMapper hotelMapper;
+    private final RagProperties props;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -47,7 +45,7 @@ public class HotelCacheService {
 
     /** hotels.json 파일에서 인메모리 캐시 로드. DB 조회 없음. */
     private void loadFromFile() throws Exception {
-        Path path = Paths.get(dataDir, "hotels.json");
+        Path path = Paths.get(props.getDataDir(), "hotels.json");
         if (!path.toFile().exists()) {
             log.info("hotels.json 없음 — 빈 캐시로 시작");
             return;
@@ -95,7 +93,7 @@ public class HotelCacheService {
      */
     private SavedOverlay loadOverlay() {
         SavedOverlay overlay = new SavedOverlay();
-        Path path = Paths.get(dataDir, "hotels.json");
+        Path path = Paths.get(props.getDataDir(), "hotels.json");
         if (!path.toFile().exists()) return overlay;
         try {
             List<HotelDto> existing = objectMapper.readValue(path.toFile(),
@@ -175,7 +173,7 @@ public class HotelCacheService {
     }
 
     private void saveToFile() throws Exception {
-        Path path = Paths.get(dataDir, "hotels.json");
+        Path path = Paths.get(props.getDataDir(), "hotels.json");
         objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValue(path.toFile(), new ArrayList<>(hotelMap.values()));
         log.info("hotels.json 저장 완료: {}", path.toAbsolutePath());

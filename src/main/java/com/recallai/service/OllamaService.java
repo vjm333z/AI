@@ -2,6 +2,8 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.OllamaProperties;
+import lombok.RequiredArgsConstructor;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -11,7 +13,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -22,18 +23,12 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class OllamaService {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaService.class);
 
-    @Value("${ollama.url}")
-    private String ollamaUrl;
-
-    @Value("${ollama.model}")
-    private String model;
-
-    @Value("${ollama.timeout-ms:30000}")
-    private int timeoutMs;
+    private final OllamaProperties props;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CloseableHttpClient httpClient;
@@ -42,7 +37,7 @@ public class OllamaService {
     private void init() {
         RequestConfig config = RequestConfig.custom()
                 .setConnectTimeout(3000)
-                .setSocketTimeout(timeoutMs)
+                .setSocketTimeout(props.getTimeoutMs())
                 .build();
         this.httpClient = HttpClients.custom().setDefaultRequestConfig(config).build();
     }
@@ -53,10 +48,10 @@ public class OllamaService {
     }
 
     public List<Double> embed(String text) throws Exception {
-        HttpPost post = new HttpPost(ollamaUrl + "/api/embeddings");
+        HttpPost post = new HttpPost(props.getUrl() + "/api/embeddings");
 
         Map<String, String> bodyMap = new HashMap<>();
-        bodyMap.put("model", model);
+        bodyMap.put("model", props.getModel());
         bodyMap.put("prompt", text);
 
         StringEntity entity = new StringEntity(objectMapper.writeValueAsString(bodyMap), "UTF-8");

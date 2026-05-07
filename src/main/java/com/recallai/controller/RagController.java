@@ -1,12 +1,15 @@
 package com.recallai.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.QdrantProperties;
+import com.recallai.config.RagProperties;
 import com.recallai.dto.KokCallMntrDto;
 import com.recallai.repository.KokCallMntrMapper;
 import com.recallai.service.HotelCacheService;
 import com.recallai.service.IndexFaqService;
 import com.recallai.service.PhoneLookupService;
 import com.recallai.service.RagService;
+import lombok.RequiredArgsConstructor;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -14,8 +17,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
@@ -25,22 +26,19 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/rag")
+@RequiredArgsConstructor
 public class RagController {
 
     private static final Logger log = LoggerFactory.getLogger(RagController.class);
     private static final ObjectMapper STATUS_PARSER = new ObjectMapper();
 
-    @Autowired private RagService ragService;
-    @Autowired private IndexFaqService indexFaqService;
-    @Autowired private HotelCacheService hotelCacheService;
-    @Autowired private PhoneLookupService phoneLookupService;
-    @Autowired private KokCallMntrMapper mapper;
-
-    @Value("${qdrant.url}")             private String qdrantUrl;
-    @Value("${qdrant.collection}")      private String qdrantCollection;
-    @Value("${rag.reranker.url}")       private String rerankerUrl;
-    @Value("${rag.reranker.enabled:false}")     private boolean rerankerEnabled;
-    @Value("${rag.query-rewrite.enabled:false}") private boolean queryRewriteEnabled;
+    private final RagService ragService;
+    private final IndexFaqService indexFaqService;
+    private final HotelCacheService hotelCacheService;
+    private final PhoneLookupService phoneLookupService;
+    private final KokCallMntrMapper mapper;
+    private final QdrantProperties qdrant;
+    private final RagProperties rag;
 
     // ─── 공통 응답 빌더 ─────────────────────────────────────────
     @FunctionalInterface
@@ -239,8 +237,8 @@ public class RagController {
     @GetMapping("/status")
     public Map<String, Object> status() {
         Map<String, Object> result = new HashMap<>();
-        result.put("reranker_enabled", rerankerEnabled);
-        result.put("query_rewrite_enabled", queryRewriteEnabled);
+        result.put("reranker_enabled", rag.getReranker().isEnabled());
+        result.put("query_rewrite_enabled", rag.getQueryRewrite().isEnabled());
         result.put("qdrant", fetchQdrantStatus());
         result.put("reranker", fetchRerankerStatus());
         return result;
@@ -250,7 +248,7 @@ public class RagController {
     private Map<String, Object> fetchQdrantStatus() {
         Map<String, Object> s = new HashMap<>();
         try (CloseableHttpClient client = HttpClients.createDefault();
-             CloseableHttpResponse res = client.execute(new HttpGet(qdrantUrl + "/collections/" + qdrantCollection))) {
+             CloseableHttpResponse res = client.execute(new HttpGet(qdrant.getUrl() + "/collections/" + qdrant.getCollection()))) {
             String body = EntityUtils.toString(res.getEntity(), "UTF-8");
             Map<String, Object> parsed = STATUS_PARSER.readValue(body, Map.class);
             Map<String, Object> r = (Map<String, Object>) parsed.get("result");
@@ -269,7 +267,7 @@ public class RagController {
     private Map<String, Object> fetchRerankerStatus() {
         Map<String, Object> s = new HashMap<>();
         try (CloseableHttpClient client = HttpClients.createDefault();
-             CloseableHttpResponse res = client.execute(new HttpGet(rerankerUrl + "/health"))) {
+             CloseableHttpResponse res = client.execute(new HttpGet(rag.getReranker().getUrl() + "/health"))) {
             s.put("available", res.getStatusLine().getStatusCode() == 200);
             s.put("body", EntityUtils.toString(res.getEntity(), "UTF-8"));
         } catch (Exception e) {

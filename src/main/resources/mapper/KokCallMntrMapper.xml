@@ -24,19 +24,23 @@
            AND CNT.USE_YN = 'Y'
     </sql>
 
+    <!--
+      mybatis 의 map-underscore-to-camel-case=true 가 컬럼명(A.PROP_CD)을 자동으로
+      DTO 필드(propCd)에 매핑. alias는 컬럼명과 결과 필드명이 다를 때만 명시.
+    -->
     <sql id="baseColumns">
-        A.SEQ_NO           as seqNo,
-        A.PROP_CD          as propCd,
-        A.CMPX_CD          as cmpxCd,
-        A.TITLE            as title,
-        A.REPORT           as report,
-        A.FEEDBACK         as feedback,
-        A.FEEDBACK_YN      as feedbackYn,
-        DATE_FORMAT(A.R_DT, '%Y-%m-%d') as rDt,
-        A.SYSTEM_CD        as systemCd,
-        SYS.DTL_CD_FULL_NM as systemNm,
-        A.SYSTEM_TP_DTL    as systemTpDtl,
-        CNT.DTL_CD_FULL_NM as systemTpDtlNm
+        A.SEQ_NO,
+        A.PROP_CD,
+        A.CMPX_CD,
+        A.TITLE,
+        A.REPORT,
+        A.FEEDBACK,
+        A.FEEDBACK_YN,
+        DATE_FORMAT(A.R_DT, '%Y-%m-%d') AS R_DT,
+        A.SYSTEM_CD,
+        SYS.DTL_CD_FULL_NM AS SYSTEM_NM,
+        A.SYSTEM_TP_DTL,
+        CNT.DTL_CD_FULL_NM AS SYSTEM_TP_DTL_NM
     </sql>
 
     <select id="selectAll" resultType="com.recallai.dto.KokCallMntrDto">
@@ -68,7 +72,9 @@
 
     <!-- phone_lookup용: PROP_CD + REPORT만, 연락처 있는 건만 -->
     <select id="selectForPhoneLookup" resultType="com.recallai.dto.KokCallMntrDto">
-        SELECT A.PROP_CD as propCd, A.REPORT as report
+        SELECT
+            A.PROP_CD,
+            A.REPORT
         FROM KOK_CALL_MNTR A
         WHERE A.REPORT IS NOT NULL
           AND A.REPORT LIKE '%연락처%'
@@ -81,15 +87,16 @@
             <include refid="baseColumns"/>
         FROM KOK_CALL_MNTR A
         <include refid="joinCodes"/>
-        WHERE A.SEQ_NO IN
-        <foreach collection="seqNos" item="id" open="(" close=")" separator=",">
-            #{id}
-        </foreach>
-        AND A.REPORT IS NOT NULL
-        AND TRIM(A.REPORT) != ''
-        AND A.FEEDBACK IS NOT NULL
-        AND TRIM(A.FEEDBACK) != ''
-        AND A.FEEDBACK_YN = 'Y'
+        WHERE
+            A.SEQ_NO IN
+            <foreach collection="seqNos" item="id" open="(" close=")" separator=",">
+                #{id}
+            </foreach>
+            AND A.REPORT IS NOT NULL
+            AND TRIM(A.REPORT) != ''
+            AND A.FEEDBACK IS NOT NULL
+            AND TRIM(A.FEEDBACK) != ''
+            AND A.FEEDBACK_YN = 'Y'
     </select>
 
 

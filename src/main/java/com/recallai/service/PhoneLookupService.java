@@ -2,12 +2,12 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.config.RagProperties;
 import com.recallai.dto.KokCallMntrDto;
 import com.recallai.repository.KokCallMntrMapper;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
  * STT 스크립트가 발신번호 → prop_cd 매칭에 사용.
  */
 @Service
+@RequiredArgsConstructor
 public class PhoneLookupService {
 
     private static final Logger log = LoggerFactory.getLogger(PhoneLookupService.class);
@@ -34,17 +35,14 @@ public class PhoneLookupService {
     private static final Pattern PHONE_PATTERN =
             Pattern.compile("연락처\\s*[:\\-]?\\s*([0-9][0-9\\-]{7,12}[0-9])");
 
-    @Autowired
-    private KokCallMntrMapper kokCallMntrMapper;
-
-    @Value("${rag.data-dir:.}")
-    private String dataDir;
+    private final KokCallMntrMapper kokCallMntrMapper;
+    private final RagProperties props;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostConstruct
     public void init() {
-        Path path = Paths.get(dataDir, "phone_lookup.json");
+        Path path = Paths.get(props.getDataDir(), "phone_lookup.json");
         Map<String, String> loaded = loadCurrent(path);
         log.info("phone_lookup.json 로드 완료: {}개 번호", loaded.size());
     }
@@ -68,7 +66,7 @@ public class PhoneLookupService {
             }
         }
 
-        Path path = Paths.get(dataDir, "phone_lookup.json");
+        Path path = Paths.get(props.getDataDir(), "phone_lookup.json");
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), lookup);
         log.info("phone_lookup.json 저장 완료: {}개 번호 → {}", lookup.size(), path.toAbsolutePath());
         return lookup;
@@ -85,7 +83,7 @@ public class PhoneLookupService {
         String digits = phoneNo.replaceAll("[^0-9]", "");
         if (digits.length() < 9) return false;
 
-        Path path = Paths.get(dataDir, "phone_lookup.json");
+        Path path = Paths.get(props.getDataDir(), "phone_lookup.json");
         Map<String, String> map = loadCurrent(path);
 
         if (map.containsKey(digits)) {
