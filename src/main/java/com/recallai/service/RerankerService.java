@@ -21,7 +21,7 @@ import java.util.*;
 
 /**
  * bge-reranker-v2-m3 (Python FastAPI) HTTP 클라이언트.
- * rag.reranker.enabled=true 인 경우 RagService에서 사용.
+ * rag.reranker.enabled=true 인 경우 SearchService에서 사용.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,11 +42,14 @@ public class RerankerService {
                 .setSocketTimeout(timeoutMs)
                 .build();
         this.httpClient = HttpClients.custom().setDefaultRequestConfig(config).build();
-        // 모델 콜드 스타트 방지 — 빈 요청으로 미리 로드
+        // 모델 콜드 스타트 방지 — 실제 HTTP 호출이 일어나야 python-svc 모델이 로드됨.
+        // 빈 documents 리스트는 rerank()에서 early-return 되므로 dummy 1건을 넣는다.
         new Thread(() -> {
             try {
                 Thread.sleep(5000); // 컨테이너 기동 대기
-                rerank("warmup", List.of(), 1);
+                Map<String, Object> dummy = new HashMap<>();
+                dummy.put("payload", Map.of("report", "warmup"));
+                rerank("warmup", List.of(dummy), 1);
                 log.info("[Reranker] 워밍업 완료");
             } catch (Exception ignored) {}
         }, "reranker-warmup").start();

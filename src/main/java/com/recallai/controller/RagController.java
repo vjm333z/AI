@@ -7,7 +7,8 @@ import com.recallai.dto.KokCallMntrDto;
 import com.recallai.repository.KokCallMntrMapper;
 import com.recallai.service.HotelCacheService;
 import com.recallai.service.IndexFaqService;
-import com.recallai.service.RagService;
+import com.recallai.service.IndexService;
+import com.recallai.service.SearchService;
 import lombok.RequiredArgsConstructor;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -31,7 +32,8 @@ public class RagController {
     private static final Logger log = LoggerFactory.getLogger(RagController.class);
     private static final ObjectMapper STATUS_PARSER = new ObjectMapper();
 
-    private final RagService ragService;
+    private final IndexService indexService;
+    private final SearchService searchService;
     private final IndexFaqService indexFaqService;
     private final HotelCacheService hotelCacheService;
     private final KokCallMntrMapper mapper;
@@ -62,20 +64,20 @@ public class RagController {
     @PostMapping("/index")
     public Map<String, Object> index() {
         return safeOp("전체 적재 실패",
-                r -> r.put("message", ragService.indexAll()));
+                r -> r.put("message", indexService.indexAll()));
     }
 
     /** HyDE 하이브리드 템플릿 적재 (inquiry_templated 컬렉션). limit=0이면 전체. */
     @PostMapping("/index/templated")
     public Map<String, Object> indexTemplated(@RequestParam(defaultValue = "0") int limit) {
         return safeOp("템플릿 적재 실패",
-                r -> r.put("message", ragService.indexAllTemplated(limit)));
+                r -> r.put("message", indexService.indexAllTemplated(limit)));
     }
 
     @PostMapping("/index/updated")
     public Map<String, Object> indexUpdated() {
         return safeOp("증분 적재 실패",
-                r -> r.put("message", ragService.indexUpdated()));
+                r -> r.put("message", indexService.indexUpdated()));
     }
 
     /** 단건 즉시 인덱싱 — KOK_CALL_MNTR 저장 직후 호출. */
@@ -88,7 +90,7 @@ public class RagController {
                 r.put("message", "seq_no=" + seqNo + " 레코드를 찾을 수 없습니다.");
                 return;
             }
-            ragService.indexSingle(list.get(0));
+            indexService.indexSingle(list.get(0));
             r.put("message", "단건 인덱싱 완료 seq_no=" + seqNo);
         });
     }
@@ -97,7 +99,7 @@ public class RagController {
     @GetMapping("/index/failed")
     public Map<String, Object> failedList() {
         return safeOp("실패 조회 실패",
-                r -> r.putAll(ragService.failedSummary()));
+                r -> r.putAll(indexService.failedSummary()));
     }
 
     /** FAQ (faq.json) Qdrant 적재. */
@@ -118,7 +120,7 @@ public class RagController {
     @PostMapping("/index/retry-failed")
     public Map<String, Object> retryFailed() {
         return safeOp("재시도 실패",
-                r -> r.putAll(ragService.retryFailed()));
+                r -> r.putAll(indexService.retryFailed()));
     }
 
     // ─── 질문/검색 ─────────────────────────────────────────────
@@ -149,7 +151,7 @@ public class RagController {
             }
 
             log.info("Received question: {} (propCd={}, mode={})", question, propCd, mode);
-            Map<String, Object> ragResult = ragService.ask(question, propCd, mode);
+            Map<String, Object> ragResult = searchService.ask(question, propCd, mode);
             r.put("mode", mode != null && !mode.isEmpty() ? mode : "default");
             r.put("answer",  ragResult.get("answer"));
             r.put("faq",     ragResult.get("faq"));
@@ -170,7 +172,7 @@ public class RagController {
                 r.put("message", "question은 필수입니다.");
                 return;
             }
-            r.putAll(ragService.searchOnly(question, propCd, mode));
+            r.putAll(searchService.searchOnly(question, propCd, mode));
         });
     }
 
@@ -189,7 +191,7 @@ public class RagController {
                                                    : Integer.parseInt(v.toString().trim());
             }
             sampleSize = Math.max(10, Math.min(300, sampleSize));
-            r.putAll(ragService.analyzeCategories(sampleSize));
+            r.putAll(searchService.analyzeCategories(sampleSize));
         });
         result.put("elapsed_ms", System.currentTimeMillis() - started);
         return result;

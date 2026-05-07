@@ -22,7 +22,7 @@ import java.util.Map;
 
 /**
  * OpenAI gpt-4o-mini — Groq 폴백용 RAG 답변 생성기.
- * RagService.ask() 가 Groq 호출 실패 시 본 서비스를 호출.
+ * SearchService.ask() 가 Groq 호출 실패 시 본 서비스를 호출.
  */
 @Service
 @RequiredArgsConstructor

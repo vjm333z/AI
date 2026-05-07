@@ -6,6 +6,7 @@ import com.recallai.config.QdrantProperties;
 import com.recallai.dto.KokCallMntrDto;
 import com.recallai.model.PointType;
 import lombok.RequiredArgsConstructor;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
@@ -44,7 +45,11 @@ public class QdrantService {
      */
     @PostConstruct
     public void init() {
-        this.httpClient = HttpClients.createDefault();
+        RequestConfig config = RequestConfig.custom()
+                .setConnectTimeout(3000)
+                .setSocketTimeout(props.getTimeoutMs())
+                .build();
+        this.httpClient = HttpClients.custom().setDefaultRequestConfig(config).build();
         try {
             for (String name : new String[]{props.getCollection(), props.getCollectionTemplated()}) {
                 if (!collectionExists(name)) {
