@@ -21,7 +21,7 @@ public class IndexScheduler {
     @Autowired
     private RagService ragService;
 
-    @Value("${rag.scheduler.enabled:true}")
+    @Value("${rag.scheduler.enabled:false}")
     private boolean enabled;
 
     @Scheduled(cron = "${rag.scheduler.cron:0 0 3 * * *}")

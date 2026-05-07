@@ -2,6 +2,7 @@ package com.recallai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.util.TextSanitizer;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -99,8 +100,8 @@ public class GroqService implements TemplatizeService {
                        .append(String.format("%.1f%%", n.doubleValue() * 100));
             }
             context.append("\n");
-            context.append("문제: ").append(cleanText(String.valueOf(payload.get("report")))).append("\n");
-            context.append("해결: ").append(cleanText(String.valueOf(payload.get("feedback")))).append("\n\n");
+            context.append("문제: ").append(TextSanitizer.cleanForPrompt(payload.get("report"))).append("\n");
+            context.append("해결: ").append(TextSanitizer.cleanForPrompt(payload.get("feedback"))).append("\n\n");
         }
 
         String userPrompt = context + "=== 현재 문의 ===\n" + question;
@@ -212,13 +213,6 @@ public class GroqService implements TemplatizeService {
             Map.of("role", "system", "content", system),
             Map.of("role", "user", "content", user)
         );
-    }
-
-    private String cleanText(String text) {
-        if (text == null || "null".equals(text)) return "";
-        return text.replaceAll("<[^>]*>", " ")
-                   .replaceAll("\\s+", " ")
-                   .trim();
     }
 
     // ============================================================

@@ -62,9 +62,8 @@ public class HotelCacheService {
 
     /** DB 재조회 후 캐시 + hotels.json 갱신. 수동 새로고침 엔드포인트에서도 호출. */
     public void refresh() throws Exception {
-        // 기존 hotels.json에서 수동 편집된 mobileNos/aliases 보존 (DB에 없는 데이터)
-        Map<String, List<String>> savedMobileNos = loadExistingMobileNos();
-        Map<String, List<String>> savedAliases = loadExistingAliases();
+        // 기존 hotels.json에서 수동 편집된 mobileNos/aliases 보존 (DB에 없는 데이터). 파싱 1회로 두 맵 동시 추출.
+        SavedOverlay overlay = loadOverlay();
 
         List<HotelDto> properties = hotelMapper.selectAllProperties();
         List<ComplexDto> complexes = hotelMapper.selectAllComplexes();
@@ -72,14 +71,14 @@ public class HotelCacheService {
         Map<String, HotelDto> map = new HashMap<>();
         for (HotelDto h : properties) {
             h.setComplexes(new ArrayList<>());
-            List<String> prevAliases = savedAliases.get(h.getPropCd());
+            List<String> prevAliases = overlay.aliases.get(h.getPropCd());
             if (prevAliases != null && !prevAliases.isEmpty()) h.setAliases(prevAliases);
             map.put(h.getPropCd(), h);
         }
         for (ComplexDto c : complexes) {
             HotelDto h = map.get(c.getPropCd());
             if (h != null) {
-                List<String> prev = savedMobileNos.get(c.getCmpxCd());
+                List<String> prev = overlay.mobileNos.get(c.getCmpxCd());
                 if (prev != null && !prev.isEmpty()) c.setMobileNos(prev);
                 h.getComplexes().add(c);
             }
@@ -90,47 +89,38 @@ public class HotelCacheService {
         log.info("호텔 정보 로드 완료: {}개 property", hotelMap.size());
     }
 
-    /** 기존 hotels.json에서 propCd → aliases 매핑 추출. 파일 없거나 파싱 실패 시 빈 맵. */
-    private Map<String, List<String>> loadExistingAliases() {
+    /**
+     * 기존 hotels.json을 한 번만 파싱해서 수동 편집된 aliases·mobileNos 추출.
+     * 파일 없거나 파싱 실패 시 빈 overlay.
+     */
+    private SavedOverlay loadOverlay() {
+        SavedOverlay overlay = new SavedOverlay();
         Path path = Paths.get(dataDir, "hotels.json");
-        if (!path.toFile().exists()) return new HashMap<>();
+        if (!path.toFile().exists()) return overlay;
         try {
             List<HotelDto> existing = objectMapper.readValue(path.toFile(),
                     new TypeReference<List<HotelDto>>() {});
-            Map<String, List<String>> result = new HashMap<>();
             for (HotelDto h : existing) {
                 if (h.getAliases() != null && !h.getAliases().isEmpty()) {
-                    result.put(h.getPropCd(), h.getAliases());
+                    overlay.aliases.put(h.getPropCd(), h.getAliases());
                 }
-            }
-            return result;
-        } catch (Exception e) {
-            log.warn("기존 hotels.json aliases 읽기 실패 (무시): {}", e.getMessage());
-            return new HashMap<>();
-        }
-    }
-
-    /** 기존 hotels.json에서 cmpxCd → mobileNos 매핑 추출. 파일 없거나 파싱 실패 시 빈 맵. */
-    private Map<String, List<String>> loadExistingMobileNos() {
-        Path path = Paths.get(dataDir, "hotels.json");
-        if (!path.toFile().exists()) return new HashMap<>();
-        try {
-            List<HotelDto> existing = objectMapper.readValue(path.toFile(),
-                    new TypeReference<List<HotelDto>>() {});
-            Map<String, List<String>> result = new HashMap<>();
-            for (HotelDto h : existing) {
                 if (h.getComplexes() == null) continue;
                 for (ComplexDto c : h.getComplexes()) {
                     if (c.getMobileNos() != null && !c.getMobileNos().isEmpty()) {
-                        result.put(c.getCmpxCd(), c.getMobileNos());
+                        overlay.mobileNos.put(c.getCmpxCd(), c.getMobileNos());
                     }
                 }
             }
-            return result;
         } catch (Exception e) {
-            log.warn("기존 hotels.json mobileNos 읽기 실패 (무시): {}", e.getMessage());
-            return new HashMap<>();
+            log.warn("기존 hotels.json 오버레이 읽기 실패 (무시): {}", e.getMessage());
         }
+        return overlay;
+    }
+
+    /** refresh()에서 보존할 수동 편집값. */
+    private static final class SavedOverlay {
+        final Map<String, List<String>> aliases   = new HashMap<>();
+        final Map<String, List<String>> mobileNos = new HashMap<>();
     }
 
     /** propCd로 짧은 호텔명 조회. 없으면 빈 문자열. */

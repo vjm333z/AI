@@ -35,15 +35,14 @@ ollama:
 qdrant:
   url: ${QDRANT_URL:http://localhost:6333}
   collection: inquiry                               # default: 원본 REPORT 임베딩
-  collection-templated: inquiry_templated           # HyDE (Groq)
-  collection-templated-gemini: inquiry_templated_gemini  # HyDE (Gemini)
+  collection-templated: inquiry_templated           # HyDE (templatize provider 결과)
   timeout-ms: 5000
 
 # RAG 검색 파이프라인 설정
 rag:
   data-dir: ${RAG_DATA_DIR:data}      # hotels.json / phone_lookup.json / last_sync.txt / failed_index.txt 저장 경로
   templatize:
-    provider: groq         # HyDE 적재에 사용할 LLM provider. 옵션: groq (구현됨) / claude / gemini / openai (확장 가능)
+    provider: groq         # HyDE 적재에 사용할 LLM provider. 현재 구현체: groq
   search:
     top-k: 10              # Qdrant에서 꺼낼 후보 수 (reranker 대비 넉넉히)
     final-top-k: 4         # 최종 LLM에 넘길 문서 수
@@ -58,8 +57,6 @@ rag:
     enabled: true              # MMR 기반 다양성 재정렬 — Top 1은 그대로, 나머지만 재선택
     jaccard-threshold: 0.7     # 이 이상이면 "유사 중복"으로 간주 (0.7 = 70% 토큰 겹침)
     lambda: 0.7                # 관련성 : 다양성 가중치. 0.7 = 관련성 70% / 다양성 30%
-  llm:
-    provider: openai       # RAG 답변 생성 LLM: openai | gemini | groq (groq는 폴백으로 항상 유지)
   query-rewrite:
     enabled: true          # true로 켜면 Groq로 검색 전 질의 확장
     timeout-ms: 3000
@@ -67,23 +64,14 @@ rag:
     enabled: false         # 사외 작업 중: 03:00 자동 증분 적재 OFF (회사 복귀 시 true)
     cron: "0 0 3 * * *"
 
-# Gemini API 설정
-gemini:
-  api-key: ${GEMINI_API_KEY}
-  model: gemini-2.5-flash
-  timeout-ms: 60000
-
-# Claude API 설정
-claude:
-  api-key: ${CLAUDE_API_KEY}
-  model: claude-sonnet-4-20250514
-
+# Groq API 설정 (RAG 답변 기본 LLM, HyDE templatize 공용)
 groq:
   api-key: ${GROQ_API_KEY}
   model: llama-3.3-70b-versatile
   url: https://api.groq.com/openai/v1/chat/completions
   timeout-ms: 30000
 
+# OpenAI API 설정 (Groq 실패 시 폴백)
 openai:
   api-key: ${OPENAI_API_KEY}
   model: gpt-4o-mini

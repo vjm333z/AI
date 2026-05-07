@@ -1,6 +1,8 @@
 package com.recallai.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.recallai.dto.KokCallMntrDto;
+import com.recallai.repository.KokCallMntrMapper;
 import com.recallai.service.HotelCacheService;
 import com.recallai.service.IndexFaqService;
 import com.recallai.service.PhoneLookupService;
@@ -16,7 +18,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -24,283 +28,178 @@ import java.util.Map;
 public class RagController {
 
     private static final Logger log = LoggerFactory.getLogger(RagController.class);
+    private static final ObjectMapper STATUS_PARSER = new ObjectMapper();
 
-    @Autowired
-    private RagService ragService;
+    @Autowired private RagService ragService;
+    @Autowired private IndexFaqService indexFaqService;
+    @Autowired private HotelCacheService hotelCacheService;
+    @Autowired private PhoneLookupService phoneLookupService;
+    @Autowired private KokCallMntrMapper mapper;
 
-    @Autowired
-    private IndexFaqService indexFaqService;
+    @Value("${qdrant.url}")             private String qdrantUrl;
+    @Value("${qdrant.collection}")      private String qdrantCollection;
+    @Value("${rag.reranker.url}")       private String rerankerUrl;
+    @Value("${rag.reranker.enabled:false}")     private boolean rerankerEnabled;
+    @Value("${rag.query-rewrite.enabled:false}") private boolean queryRewriteEnabled;
 
-    @Autowired
-    private HotelCacheService hotelCacheService;
+    // ─── 공통 응답 빌더 ─────────────────────────────────────────
+    @FunctionalInterface
+    private interface RagOp { void run(Map<String, Object> result) throws Exception; }
 
-    @Autowired
-    private com.recallai.repository.KokCallMntrMapper mapper;
+    /** try-catch + success/message 보일러플레이트 묶음. op 안에서 result에 키만 채우면 됨. */
+    private Map<String, Object> safeOp(String errorLog, RagOp op) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            op.run(result);
+            result.putIfAbsent("success", true);
+        } catch (Exception e) {
+            log.error(errorLog, e);
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
 
-    @Value("${qdrant.url}")
-    private String qdrantUrl;
+    // ─── 인덱싱 ─────────────────────────────────────────────────
 
-    @Value("${qdrant.collection}")
-    private String qdrantCollection;
-
-    @Value("${rag.reranker.url}")
-    private String rerankerUrl;
-
-    @Value("${rag.reranker.enabled:false}")
-    private boolean rerankerEnabled;
-
-    @Value("${rag.query-rewrite.enabled:false}")
-    private boolean queryRewriteEnabled;
-
-    // MariaDB 데이터 전체 인덱싱 (최초 1회)
+    /** MariaDB 데이터 전체 인덱싱 (최초 1회). */
     @PostMapping("/index")
     public Map<String, Object> index() {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String msg = ragService.indexAll();
-            result.put("success", true);
-            result.put("message", msg);
-        } catch (Exception e) {
-            log.error("전체 적재 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+        return safeOp("전체 적재 실패",
+                r -> r.put("message", ragService.indexAll()));
     }
 
-    // 질문 → RAG 답변 (+ 유사 사례 원문)
-    // mode: "default" | "templated" — A/B 비교용 컬렉션 선택
-    @PostMapping("/ask")
-    public Map<String, Object> ask(@RequestBody(required = false) Map<String, Object> body) {
-        Map<String, Object> result = new HashMap<>();
-        long started = System.currentTimeMillis();
-        try {
-            if (body == null) {
-                result.put("success", false);
-                result.put("message", "요청 본문(JSON)이 비어있습니다. 예: {\"question\": \"...\"}");
-                return result;
-            }
-
-            String question = body.get("question") != null ? body.get("question").toString().trim() : "";
-            String propCd = body.get("propCd") != null ? body.get("propCd").toString().trim() : null;
-            String mode = body.get("mode") != null ? body.get("mode").toString().trim() : null;
-
-            if (question.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "question은 필수입니다.");
-                return result;
-            }
-            if (question.length() > 2000) {
-                result.put("success", false);
-                result.put("message", "question은 2000자 이하여야 합니다. (현재: " + question.length() + "자)");
-                return result;
-            }
-
-            log.info("Received question: {} (propCd={}, mode={})", question, propCd, mode);
-
-            Map<String, Object> ragResult = ragService.ask(question, propCd, mode);
-            result.put("success", true);
-            result.put("mode", mode != null ? mode : "default");
-            result.put("answer", ragResult.get("answer"));
-            result.put("faq", ragResult.get("faq"));
-            result.put("sources", ragResult.get("sources"));
-            result.put("elapsed_ms", System.currentTimeMillis() - started);
-        } catch (Exception e) {
-            log.error("ask 처리 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
-    }
-
-    /** HyDE 하이브리드 템플릿 적재 (inquiry_templated 컬렉션). limit 파라미터로 건수 제한 가능. */
+    /** HyDE 하이브리드 템플릿 적재 (inquiry_templated 컬렉션). limit=0이면 전체. */
     @PostMapping("/index/templated")
     public Map<String, Object> indexTemplated(@RequestParam(defaultValue = "0") int limit) {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String msg = ragService.indexAllTemplated(limit);
-            result.put("success", true);
-            result.put("message", msg);
-        } catch (Exception e) {
-            log.error("템플릿 적재 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
-    }
-
-    /** Gemini Flash로 템플릿화 → inquiry_templated_gemini 컬렉션 적재. limit으로 건수 제한. */
-    @PostMapping("/index/templated/gemini")
-    public Map<String, Object> indexTemplatedGemini(@RequestParam(defaultValue = "0") int limit) {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String msg = ragService.indexAllTemplatedGemini(limit);
-            result.put("success", true);
-            result.put("message", msg);
-        } catch (Exception e) {
-            log.error("Gemini 템플릿 적재 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
-    }
-
-    /** 디버그·튜닝용: LLM 없이 검색 결과만 확인 — 품질 검증용 */
-    @PostMapping("/search")
-    public Map<String, Object> search(@RequestBody Map<String, Object> body) {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String question = body.get("question") != null ? body.get("question").toString().trim() : "";
-            String propCd = body.get("propCd") != null ? body.get("propCd").toString().trim() : null;
-            String mode = body.get("mode") != null ? body.get("mode").toString().trim() : null;
-            if (question.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "question은 필수입니다.");
-                return result;
-            }
-            Map<String, Object> searchResult = ragService.searchOnly(question, propCd, mode);
-            result.put("success", true);
-            result.putAll(searchResult);
-        } catch (Exception e) {
-            log.error("search 처리 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
-    }
-
-    /**
-     * Qdrant 적재분에서 랜덤 샘플링 → Groq에 "이 문의들 어떻게 분류될까" 던져 카테고리 체계 제안받기.
-     * 요청 바디(옵션): {"sampleSize": 150}  — 범위 10~300, 기본 150
-     */
-    @PostMapping("/analyze-categories")
-    public Map<String, Object> analyzeCategories(@RequestBody(required = false) Map<String, Object> body) {
-        Map<String, Object> result = new HashMap<>();
-        long started = System.currentTimeMillis();
-        try {
-            int sampleSize = 150;
-            if (body != null && body.get("sampleSize") != null) {
-                Object v = body.get("sampleSize");
-                if (v instanceof Number) sampleSize = ((Number) v).intValue();
-                else sampleSize = Integer.parseInt(v.toString().trim());
-            }
-            if (sampleSize < 10) sampleSize = 10;
-            if (sampleSize > 300) sampleSize = 300;
-
-            Map<String, Object> r = ragService.analyzeCategories(sampleSize);
-            result.put("success", true);
-            result.putAll(r);
-            result.put("elapsed_ms", System.currentTimeMillis() - started);
-        } catch (Exception e) {
-            log.error("카테고리 분석 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            result.put("elapsed_ms", System.currentTimeMillis() - started);
-        }
-        return result;
+        return safeOp("템플릿 적재 실패",
+                r -> r.put("message", ragService.indexAllTemplated(limit)));
     }
 
     @PostMapping("/index/updated")
     public Map<String, Object> indexUpdated() {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String msg = ragService.indexUpdated();
-            result.put("success", true);
-            result.put("message", msg);
-        } catch (Exception e) {
-            log.error("증분 적재 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+        return safeOp("증분 적재 실패",
+                r -> r.put("message", ragService.indexUpdated()));
     }
 
-    /** 단건 즉시 인덱싱 — KOK_CALL_MNTR 저장 직후 호출. seqNo로 레코드 조회 후 Qdrant upsert. */
+    /** 단건 즉시 인덱싱 — KOK_CALL_MNTR 저장 직후 호출. */
     @PostMapping("/index/single/{seqNo}")
     public Map<String, Object> indexSingle(@PathVariable Integer seqNo) {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            java.util.List<com.recallai.dto.KokCallMntrDto> list =
-                    mapper.selectBySeqNos(java.util.Collections.singletonList(seqNo));
+        return safeOp("단건 인덱싱 실패 seq_no=" + seqNo, r -> {
+            List<KokCallMntrDto> list = mapper.selectBySeqNos(Collections.singletonList(seqNo));
             if (list.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "seq_no=" + seqNo + " 레코드를 찾을 수 없습니다.");
-                return result;
+                r.put("success", false);
+                r.put("message", "seq_no=" + seqNo + " 레코드를 찾을 수 없습니다.");
+                return;
             }
             ragService.indexSingle(list.get(0));
-            result.put("success", true);
-            result.put("message", "단건 인덱싱 완료 seq_no=" + seqNo);
-        } catch (Exception e) {
-            log.error("단건 인덱싱 실패 seq_no={}", seqNo, e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+            r.put("message", "단건 인덱싱 완료 seq_no=" + seqNo);
+        });
     }
 
-    /** 실패 장부 조회 (failed_index.txt). 개수·사유별 집계·샘플 10건. */
+    /** 실패 장부 조회 (failed_index.txt). */
     @GetMapping("/index/failed")
     public Map<String, Object> failedList() {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            result.put("success", true);
-            result.putAll(ragService.failedSummary());
-        } catch (Exception e) {
-            log.error("실패 조회 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+        return safeOp("실패 조회 실패",
+                r -> r.putAll(ragService.failedSummary()));
     }
 
-    /** FAQ (faq.json) Qdrant 적재 — type=FAQ로 upsert */
+    /** FAQ (faq.json) Qdrant 적재. */
     @PostMapping("/index/faq")
     public Map<String, Object> indexFaq() {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String msg = indexFaqService.indexFaq();
-            result.put("success", true);
-            result.put("message", msg);
-        } catch (Exception e) {
-            log.error("FAQ 적재 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+        return safeOp("FAQ 적재 실패",
+                r -> r.put("message", indexFaqService.indexFaq()));
     }
 
-    /** 기존 REAL 포인트에 type=REAL payload 일괄 설정 (재임베딩 없음) */
+    /** 기존 REAL 포인트에 type=REAL payload 일괄 설정 (재임베딩 없음). */
     @PostMapping("/index/set-types")
     public Map<String, Object> setTypes() {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            String msg = indexFaqService.setTypesOnExisting();
-            result.put("success", true);
-            result.put("message", msg);
-        } catch (Exception e) {
-            log.error("type 설정 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+        return safeOp("type 설정 실패",
+                r -> r.put("message", indexFaqService.setTypesOnExisting()));
     }
 
-    /** 실패 장부에 있는 seq_no들을 DB에서 재조회해 다시 적재. 성공 건은 장부에서 제거. */
+    /** 실패 장부 재시도. 성공 건은 장부에서 제거. */
     @PostMapping("/index/retry-failed")
     public Map<String, Object> retryFailed() {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            result.putAll(ragService.retryFailed());
-        } catch (Exception e) {
-            log.error("재시도 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
+        return safeOp("재시도 실패",
+                r -> r.putAll(ragService.retryFailed()));
+    }
+
+    // ─── 질문/검색 ─────────────────────────────────────────────
+
+    /** 질문 → RAG 답변. mode: "default" | "templated" — A/B 비교용 컬렉션 선택. */
+    @PostMapping("/ask")
+    public Map<String, Object> ask(@RequestBody(required = false) Map<String, Object> body) {
+        long started = System.currentTimeMillis();
+        return safeOp("ask 처리 실패", r -> {
+            if (body == null) {
+                r.put("success", false);
+                r.put("message", "요청 본문(JSON)이 비어있습니다. 예: {\"question\": \"...\"}");
+                return;
+            }
+            String question = trimStr(body, "question");
+            String propCd   = trimStr(body, "propCd");
+            String mode     = trimStr(body, "mode");
+
+            if (question.isEmpty()) {
+                r.put("success", false);
+                r.put("message", "question은 필수입니다.");
+                return;
+            }
+            if (question.length() > 2000) {
+                r.put("success", false);
+                r.put("message", "question은 2000자 이하여야 합니다. (현재: " + question.length() + "자)");
+                return;
+            }
+
+            log.info("Received question: {} (propCd={}, mode={})", question, propCd, mode);
+            Map<String, Object> ragResult = ragService.ask(question, propCd, mode);
+            r.put("mode", mode != null && !mode.isEmpty() ? mode : "default");
+            r.put("answer",  ragResult.get("answer"));
+            r.put("faq",     ragResult.get("faq"));
+            r.put("sources", ragResult.get("sources"));
+            r.put("elapsed_ms", System.currentTimeMillis() - started);
+        });
+    }
+
+    /** 디버그·튜닝용: LLM 없이 검색 결과만 확인. */
+    @PostMapping("/search")
+    public Map<String, Object> search(@RequestBody Map<String, Object> body) {
+        return safeOp("search 처리 실패", r -> {
+            String question = trimStr(body, "question");
+            String propCd   = trimStr(body, "propCd");
+            String mode     = trimStr(body, "mode");
+            if (question.isEmpty()) {
+                r.put("success", false);
+                r.put("message", "question은 필수입니다.");
+                return;
+            }
+            r.putAll(ragService.searchOnly(question, propCd, mode));
+        });
+    }
+
+    /**
+     * Qdrant 적재분에서 랜덤 샘플링 → Groq에 카테고리 체계 제안받기.
+     * 요청 바디(옵션): {"sampleSize": 150}  — 범위 10~300, 기본 150.
+     */
+    @PostMapping("/analyze-categories")
+    public Map<String, Object> analyzeCategories(@RequestBody(required = false) Map<String, Object> body) {
+        long started = System.currentTimeMillis();
+        Map<String, Object> result = safeOp("카테고리 분석 실패", r -> {
+            int sampleSize = 150;
+            if (body != null && body.get("sampleSize") != null) {
+                Object v = body.get("sampleSize");
+                sampleSize = (v instanceof Number) ? ((Number) v).intValue()
+                                                   : Integer.parseInt(v.toString().trim());
+            }
+            sampleSize = Math.max(10, Math.min(300, sampleSize));
+            r.putAll(ragService.analyzeCategories(sampleSize));
+        });
+        result.put("elapsed_ms", System.currentTimeMillis() - started);
         return result;
     }
 
-    @Autowired
-    private PhoneLookupService phoneLookupService;
+    // ─── 호텔/전화번호 캐시 관리 ─────────────────────────────────
 
     /**
      * 신규 호텔 추가 — PMS 통화업무등록 시 hotels.json에 없는 호텔 자동 등록.
@@ -308,62 +207,35 @@ public class RagController {
      */
     @PostMapping("/hotels/add")
     public Map<String, Object> addHotel(@RequestBody Map<String, Object> body) {
-        Map<String, Object> result = new HashMap<>();
-        try {
+        return safeOp("호텔 추가 실패", r -> {
             boolean added = hotelCacheService.addHotelIfAbsent(
-                str(body, "propCd"), str(body, "propShrtNm"), str(body, "propFullNm"),
-                str(body, "cmpxCd"),  str(body, "cmpxNm"),   str(body, "cmpxReprTel"));
-            result.put("success", true);
-            result.put("added", added);
-        } catch (Exception e) {
-            log.error("호텔 추가 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+                    str(body, "propCd"),  str(body, "propShrtNm"), str(body, "propFullNm"),
+                    str(body, "cmpxCd"),  str(body, "cmpxNm"),     str(body, "cmpxReprTel"));
+            r.put("added", added);
+        });
     }
 
-    /**
-     * 전화번호 → propCd 매핑 추가 — PMS 통화업무등록 시 phone_lookup.json에 없는 번호 자동 등록.
-     * body: { phoneNo, propCd }
-     */
+    /** 전화번호 → propCd 매핑 추가. */
     @PostMapping("/phone-lookup/add")
     public Map<String, Object> addPhoneLookup(@RequestBody Map<String, Object> body) {
-        Map<String, Object> result = new HashMap<>();
-        try {
+        return safeOp("phone_lookup 추가 실패", r -> {
             boolean added = phoneLookupService.addIfAbsent(str(body, "phoneNo"), str(body, "propCd"));
-            result.put("success", true);
-            result.put("added", added);
-        } catch (Exception e) {
-            log.error("phone_lookup 추가 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+            r.put("added", added);
+        });
     }
 
-    private String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v != null ? v.toString() : null;
-    }
-
-    /** 호텔 정보 캐시 새로고침 (DB 재조회 + hotels.json 재저장) */
+    /** 호텔 정보 캐시 새로고침 (DB 재조회 + hotels.json 재저장). */
     @PostMapping("/hotels/refresh")
     public Map<String, Object> refreshHotels() {
-        Map<String, Object> result = new HashMap<>();
-        try {
+        return safeOp("호텔 캐시 새로고침 실패", r -> {
             hotelCacheService.refresh();
-            result.put("success", true);
-            result.put("count", hotelCacheService.getAllHotels().size());
-        } catch (Exception e) {
-            log.error("호텔 캐시 새로고침 실패", e);
-            result.put("success", false);
-            result.put("message", e.getMessage());
-        }
-        return result;
+            r.put("count", hotelCacheService.getAllHotels().size());
+        });
     }
 
-    /** 시스템 상태 조회 (Qdrant 건수, Reranker 가용성, 플래그) */
+    // ─── 상태 ────────────────────────────────────────────────────
+
+    /** 시스템 상태 (Qdrant 건수, Reranker 가용성, 플래그). */
     @GetMapping("/status")
     public Map<String, Object> status() {
         Map<String, Object> result = new HashMap<>();
@@ -374,20 +246,18 @@ public class RagController {
         return result;
     }
 
+    @SuppressWarnings("unchecked")
     private Map<String, Object> fetchQdrantStatus() {
         Map<String, Object> s = new HashMap<>();
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet get = new HttpGet(qdrantUrl + "/collections/" + qdrantCollection);
-            try (CloseableHttpResponse res = client.execute(get)) {
-                String body = EntityUtils.toString(res.getEntity(), "UTF-8");
-                ObjectMapper m = new ObjectMapper();
-                Map<String, Object> parsed = m.readValue(body, Map.class);
-                Map<String, Object> r = (Map<String, Object>) parsed.get("result");
-                s.put("available", r != null);
-                if (r != null) {
-                    s.put("points_count", r.get("points_count"));
-                    s.put("status", r.get("status"));
-                }
+        try (CloseableHttpClient client = HttpClients.createDefault();
+             CloseableHttpResponse res = client.execute(new HttpGet(qdrantUrl + "/collections/" + qdrantCollection))) {
+            String body = EntityUtils.toString(res.getEntity(), "UTF-8");
+            Map<String, Object> parsed = STATUS_PARSER.readValue(body, Map.class);
+            Map<String, Object> r = (Map<String, Object>) parsed.get("result");
+            s.put("available", r != null);
+            if (r != null) {
+                s.put("points_count", r.get("points_count"));
+                s.put("status",       r.get("status"));
             }
         } catch (Exception e) {
             s.put("available", false);
@@ -398,16 +268,26 @@ public class RagController {
 
     private Map<String, Object> fetchRerankerStatus() {
         Map<String, Object> s = new HashMap<>();
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpGet get = new HttpGet(rerankerUrl + "/health");
-            try (CloseableHttpResponse res = client.execute(get)) {
-                s.put("available", res.getStatusLine().getStatusCode() == 200);
-                s.put("body", EntityUtils.toString(res.getEntity(), "UTF-8"));
-            }
+        try (CloseableHttpClient client = HttpClients.createDefault();
+             CloseableHttpResponse res = client.execute(new HttpGet(rerankerUrl + "/health"))) {
+            s.put("available", res.getStatusLine().getStatusCode() == 200);
+            s.put("body", EntityUtils.toString(res.getEntity(), "UTF-8"));
         } catch (Exception e) {
             s.put("available", false);
             s.put("error", e.getMessage());
         }
         return s;
+    }
+
+    // ─── 헬퍼 ────────────────────────────────────────────────────
+
+    private static String str(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        return v != null ? v.toString() : null;
+    }
+
+    private static String trimStr(Map<String, Object> m, String key) {
+        Object v = m == null ? null : m.get(key);
+        return v != null ? v.toString().trim() : "";
     }
 }

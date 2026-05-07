@@ -36,25 +36,21 @@ public class QdrantService {
     @Value("${qdrant.collection-templated:inquiry_templated}")
     private String collectionTemplated;
 
-    @Value("${qdrant.collection-templated-gemini:inquiry_templated_gemini}")
-    private String collectionTemplatedGemini;
-
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CloseableHttpClient httpClient;
 
     public String getDefaultCollection() { return collection; }
     public String getTemplatedCollection() { return collectionTemplated; }
-    public String getTemplatedGeminiCollection() { return collectionTemplatedGemini; }
 
     /**
-     * 앱 시동 시 세 컬렉션(default + templated + templated_gemini)이 없으면 자동 생성 + 인덱스 보장.
+     * 앱 시동 시 두 컬렉션(default + templated)이 없으면 자동 생성 + 인덱스 보장.
      * Qdrant 미기동 상태에서 앱만 올라가는 경우를 위해 실패해도 앱은 죽지 않음.
      */
     @PostConstruct
     public void init() {
         this.httpClient = HttpClients.createDefault();
         try {
-            for (String name : new String[]{collection, collectionTemplated, collectionTemplatedGemini}) {
+            for (String name : new String[]{collection, collectionTemplated}) {
                 if (!collectionExists(name)) {
                     log.info("Qdrant 컬렉션 '{}' 미존재 → 자동 생성 (dim={}, Cosine)", name, VECTOR_DIM);
                     createCollection(name);
@@ -179,11 +175,6 @@ public class QdrantService {
         }
     }
 
-    /** default 컬렉션(inquiry)에 기본 payload로 저장 — 기존 호출부 호환 */
-    public void upsert(Integer id, List<Double> vector, KokCallMntrDto dto) throws Exception {
-        upsertTo(collection, id, vector, dto, null);
-    }
-
     /**
      * 컬렉션 지정 + extra payload(HyDE 필드 등) 추가 저장.
      * @param collectionName 대상 컬렉션 이름
@@ -301,16 +292,6 @@ public class QdrantService {
         }
         log.info("Qdrant scroll 완료: 총 {}건", all.size());
         return all;
-    }
-
-    /** default 컬렉션 검색 — 기존 호출부 호환 */
-    public List<Map<String, Object>> search(List<Double> queryVector, int topK, String propCd) throws Exception {
-        return searchIn(collection, queryVector, topK, propCd);
-    }
-
-    /** type 필터 없이 검색 — 기존 호출부 호환 */
-    public List<Map<String, Object>> searchIn(String collectionName, List<Double> queryVector, int topK, String propCd) throws Exception {
-        return searchIn(collectionName, queryVector, topK, propCd, null);
     }
 
     /**

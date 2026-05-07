@@ -33,10 +33,9 @@ services:
       # Reranker
       RERANKER_MODEL: BAAI/bge-reranker-v2-m3
       RERANKER_FP16: "true"
-      # STT — Groq + LLM
+      # STT — Groq + 요약 LLM (provider: openai | groq)
       GROQ_STT_API_KEY: ${GROQ_STT_API_KEY:-${GROQ_API_KEY}}
       GROQ_LLM_API_KEY: ${GROQ_LLM_API_KEY:-${GROQ_API_KEY}}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       # AIA DB (운영 PMS DB)
@@ -67,8 +66,6 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       GROQ_API_KEY: ${GROQ_API_KEY}
-      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       RAG_RERANKER_MIN_SCORE: "0.6"
       RAG_QUERY_REWRITE_ENABLED: "true"

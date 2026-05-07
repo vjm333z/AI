@@ -46,13 +46,7 @@ public class RagService {
     private GroqService groqService;
 
     @Autowired
-    private GeminiTemplatizeService geminiService;
-
-    @Autowired
     private OpenAiService openAiService;
-
-    @Value("${rag.llm.provider:groq}")
-    private String llmProvider;
 
     @Autowired
     private RerankerService rerankerService;
@@ -89,7 +83,7 @@ public class RagService {
     @Value("${rag.search.faq-top-k:3}")
     private int faqTopK;
 
-    @Value("${rag.search.faq-score-threshold:0.80}")
+    @Value("${rag.search.faq-score-threshold:0.60}")
     private double faqScoreThreshold;
 
     @Value("${rag.reranker.enabled:false}")
@@ -305,12 +299,9 @@ public class RagService {
         return svc;
     }
 
-    public String indexAllTemplated() throws Exception { return indexAllTemplated(0); }
+    /** HyDE 템플릿 적재 — provider/collection은 application.yml 기본값. limit=0 이면 전체. */
     public String indexAllTemplated(int limit) throws Exception {
         return indexAllTemplatedWith(templatizeProvider, qdrantService.getTemplatedCollection(), limit);
-    }
-    public String indexAllTemplatedGemini(int limit) throws Exception {
-        return indexAllTemplatedWith("gemini", qdrantService.getTemplatedGeminiCollection(), limit);
     }
 
     public String indexAllTemplatedWith(String provider, String collectionName, int limit) throws Exception {
@@ -535,26 +526,14 @@ public class RagService {
         // 5. (옵션) Reranker + MMR
         List<Map<String, Object>> finalCases = rankAndDiversify(question, filteredCases);
 
-        // 6. LLM 답변 생성 — provider 설정에 따라 분기, 실패 시 Groq 폴백
+        // 6. LLM 답변 생성 — Groq 우선, 실패 시 OpenAI 폴백.
         String answer;
-        if ("openai".equalsIgnoreCase(llmProvider)) {
-            try {
-                answer = openAiService.ask(question, finalCases);
-                log.info("OpenAI 답변 생성 완료");
-            } catch (Exception e) {
-                log.warn("OpenAI 답변 실패, Groq 폴백: {}", e.getMessage());
-                answer = groqService.ask(question, finalCases);
-            }
-        } else if ("gemini".equalsIgnoreCase(llmProvider)) {
-            try {
-                answer = geminiService.ask(question, finalCases);
-                log.info("Gemini 답변 생성 완료");
-            } catch (Exception e) {
-                log.warn("Gemini 답변 실패, Groq 폴백: {}", e.getMessage());
-                answer = groqService.ask(question, finalCases);
-            }
-        } else {
+        try {
             answer = groqService.ask(question, finalCases);
+            log.info("Groq 답변 생성 완료");
+        } catch (Exception e) {
+            log.warn("Groq 답변 실패, OpenAI 폴백: {}", e.getMessage());
+            answer = openAiService.ask(question, finalCases);
         }
 
         // 7. 응답 구성
@@ -565,10 +544,9 @@ public class RagService {
         return response;
     }
 
-    /** "templated" → inquiry_templated, "templated_gemini" → inquiry_templated_gemini, 그 외 → default */
+    /** "templated" → inquiry_templated, 그 외 → default */
     private String resolveCollection(String mode) {
         if ("templated".equalsIgnoreCase(mode)) return qdrantService.getTemplatedCollection();
-        if ("templated_gemini".equalsIgnoreCase(mode)) return qdrantService.getTemplatedGeminiCollection();
         return qdrantService.getDefaultCollection();
     }
 

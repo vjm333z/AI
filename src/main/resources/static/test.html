@@ -46,7 +46,6 @@
     }
     .col-head.default    { background: #4d78d8; }
     .col-head.templated  { background: #7a4dd8; }
-    .col-head.templated_gemini { background: #1a9e6e; }
     .col-body { background: #fff; border: 1px solid #e3e3e3; border-top: none; border-radius: 0 0 8px 8px; padding: 14px; flex: 1; }
 
     .answer { background: #f3f8ff; border-left: 4px solid #2a66ff; padding: 12px; border-radius: 4px; white-space: pre-wrap; font-size: 14px; margin-bottom: 10px; }
@@ -93,14 +92,12 @@
     .index-btns button { font-size:12px; padding:6px 14px; }
     .btn-groq   { background:#7a4dd8; }
     .btn-groq:hover   { background:#5c38a8; }
-    .btn-gemini { background:#1a9e6e; }
-    .btn-gemini:hover { background:#147a55; }
     .index-log { font-size:12px; color:#444; background:#f7f7f7; border-radius:6px; padding:8px 12px; margin-top:8px; white-space:pre-wrap; max-height:120px; overflow-y:auto; display:none; }
   </style>
 </head>
 <body>
-  <h1>기억사무소 RAG - A/B/C 비교 테스트</h1>
-  <div class="sub">같은 질문을 세 컬렉션에 동시 질의해 품질 비교 (A: 원본 / B: HyDE Groq / C: HyDE Gemini)</div>
+  <h1>기억사무소 RAG - A/B 비교 테스트</h1>
+  <div class="sub">같은 질문을 두 컬렉션에 동시 질의해 품질 비교 (A: 원본 / B: HyDE Groq)</div>
 
   <div class="card">
     <label for="q">질문</label>
@@ -108,7 +105,7 @@
     <label for="prop">propCd (선택)</label>
     <input id="prop" placeholder="비워두면 전체 검색" />
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <button id="askBtn" onclick="ask()">A/B/C 질문하기 (Ctrl+Enter)</button>
+      <button id="askBtn" onclick="ask()">A/B 질문하기 (Ctrl+Enter)</button>
       <span style="font-size:12px; color:#888;">샘플:</span>
       <span class="sample" onclick="setQ('Seetrol 접속이 해제되었어요')">Seetrol 해제</span>
       <span class="sample" onclick="setQ('카드 결제가 승인되지 않고 바탕화면으로 튕겨요')">카드 승인 실패</span>
@@ -123,9 +120,8 @@
   <details class="index-panel">
     <summary>데이터 적재 (HyDE 템플릿화)</summary>
     <div class="index-btns">
-      <button class="btn-groq"   onclick="runIndex('groq',   10)">Groq 10건 적재</button>
-      <button class="btn-gemini" onclick="runIndex('gemini', 10)">Gemini 10건 적재</button>
-      <button class="btn-gemini" onclick="runIndex('gemini', 0)" style="opacity:0.85">Gemini 전체 적재</button>
+      <button class="btn-groq" onclick="runIndex('groq', 10)">Groq 10건 적재</button>
+      <button class="btn-groq" onclick="runIndex('groq', 0)" style="opacity:0.85">Groq 전체 적재</button>
     </div>
     <div id="indexLog" class="index-log"></div>
   </details>
@@ -144,9 +140,9 @@
   </div>
 
   <script>
-    const MODES = ['default', 'templated', 'templated_gemini'];
-    let sourcesByMode = { default: [], templated: [], templated_gemini: [] };
-    let faqByMode    = { default: [], templated: [], templated_gemini: [] };
+    const MODES = ['default', 'templated'];
+    let sourcesByMode = { default: [], templated: [] };
+    let faqByMode    = { default: [], templated: [] };
 
     async function ask() {
       const question = document.getElementById('q').value.trim();
@@ -155,16 +151,16 @@
       const result = document.getElementById('result');
       const btn    = document.getElementById('askBtn');
       btn.disabled = true;
-      result.innerHTML = '<div class="card loading">세 컬렉션에 병렬 질의 중...</div>';
+      result.innerHTML = '<div class="card loading">두 컬렉션에 병렬 질의 중...</div>';
 
       const base = { question };
       if (propCd) base.propCd = propCd;
 
       try {
-        const [defRes, tplRes, gemRes] = await Promise.allSettled(
+        const [defRes, tplRes] = await Promise.allSettled(
           MODES.map(m => fetchAsk({ ...base, mode: m }))
         );
-        render(defRes, tplRes, gemRes);
+        render(defRes, tplRes);
       } catch (e) {
         result.innerHTML = '<div class="card error">' + e.message + '</div>';
       } finally {
@@ -181,13 +177,12 @@
       return res.json();
     }
 
-    function render(defRes, tplRes, gemRes) {
+    function render(defRes, tplRes) {
       const result = document.getElementById('result');
       result.innerHTML =
         '<div class="abc-grid">'
-          + renderColumn('default',          'A · 원본 (inquiry)',                   defRes)
-          + renderColumn('templated',        'B · HyDE Groq (inquiry_templated)',    tplRes)
-          + renderColumn('templated_gemini', 'C · HyDE Gemini (inquiry_templated_gemini)', gemRes)
+          + renderColumn('default',   'A · 원본 (inquiry)',                defRes)
+          + renderColumn('templated', 'B · HyDE Groq (inquiry_templated)', tplRes)
         + '</div>';
     }
 
@@ -226,7 +221,6 @@
         ? '<div class="src-hyde"><b>Q:</b> ' + escapeHtml(s.core_question) + '</div>'
         : '';
       const simCount = s.similar_count;
-      const prefix = mode === 'default' ? '[A]' : mode === 'templated' ? '[B]' : '[C]';
       return '<div class="source" onclick="openModal(\'' + mode + '\',' + i + ')">'
         + '<div class="src-head">'
           + '<span class="src-score">' + score + '</span>'
@@ -270,7 +264,7 @@
       if (!s) return;
       document.getElementById('mReportLabel').textContent   = '문의 내용 (원문)';
       document.getElementById('mFeedbackLabel').textContent = '답변 (원문)';
-      const prefix = mode === 'default' ? '[A] ' : mode === 'templated' ? '[B] ' : '[C] ';
+      const prefix = mode === 'default' ? '[A] ' : '[B] ';
       document.getElementById('mTitle').textContent = prefix + (s.core_question || '#' + s.seq_no);
       const cat = [s.system_nm, s.system_tp_dtl_nm].filter(Boolean).join(' / ');
       document.getElementById('mMeta').textContent =
@@ -302,9 +296,7 @@
     async function runIndex(provider, limit) {
       const log = document.getElementById('indexLog');
       log.style.display = 'block';
-      const endpoint = provider === 'gemini'
-        ? '/api/rag/index/templated/gemini'
-        : '/api/rag/index/templated';
+      const endpoint = '/api/rag/index/templated';
       const url = limit > 0 ? endpoint + '?limit=' + limit : endpoint;
       log.textContent += '[' + new Date().toLocaleTimeString() + '] ' + provider.toUpperCase() + ' 적재 요청 (limit=' + (limit || '전체') + ')...\n';
       try {
