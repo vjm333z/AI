@@ -24,8 +24,8 @@ from transcribe_summarize import (
     save_markdown_report, _inject_caller_contact,
 )
 from hotel_matcher import (
-    load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
-    find_hotel_by_call_no, find_hotel_by_phone_lookup,
+    load_hotels, build_alias_pairs, fix_hotel_names,
+    find_hotel_by_call_no,
     find_hotel_from_text, find_cmpx_from_text, add_alias,
 )
 from corrections import DAOL_RECEIVER_NOS
@@ -58,9 +58,6 @@ def process_file(audio_path: Path, save_db: bool, db_cfg: dict):
     hotels_path  = str(HOTELS_JSON) if HOTELS_JSON.exists() else None
     hotels       = load_hotels(hotels_path) if hotels_path else []
     alias_pairs  = build_alias_pairs(hotels)
-    phone_lookup = {}
-    if hotels_path:
-        phone_lookup = load_phone_lookup(str(Path(hotels_path).parent / "phone_lookup.json"))
 
     stt_result = transcribe_groq(str(audio_path))
     if alias_pairs:
@@ -72,8 +69,6 @@ def process_file(audio_path: Path, save_db: bool, db_cfg: dict):
     pre_hotel, pre_cmpx = find_hotel_by_call_no(caller_no, hotels) or (None, None)
     if not pre_hotel:
         pre_hotel, pre_cmpx = find_hotel_by_call_no(receiver_no, hotels) or (None, None)
-    if not pre_hotel and phone_lookup:
-        pre_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
     hotel_display = (pre_cmpx.get("cmpxNm") if pre_cmpx else None) \
                     or (pre_hotel.get("propShrtNm") if pre_hotel else None)
 
@@ -96,10 +91,6 @@ def process_file(audio_path: Path, save_db: bool, db_cfg: dict):
         if matched_hotel:
             prop_cd = matched_hotel.get("propCd")
             cmpx_cd = matched_cmpx.get("cmpxCd") if matched_cmpx else None
-    if not matched_hotel and phone_lookup:
-        matched_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
-        if matched_hotel:
-            prop_cd = matched_hotel.get("propCd")
     if not matched_hotel and summary and "error" not in summary:
         search_text = " ".join(filter(None, [
             summary.get("speaker_B", ""), summary.get("report", ""),

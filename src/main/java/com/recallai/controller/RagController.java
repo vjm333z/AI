@@ -7,7 +7,6 @@ import com.recallai.dto.KokCallMntrDto;
 import com.recallai.repository.KokCallMntrMapper;
 import com.recallai.service.HotelCacheService;
 import com.recallai.service.IndexFaqService;
-import com.recallai.service.PhoneLookupService;
 import com.recallai.service.RagService;
 import lombok.RequiredArgsConstructor;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -35,7 +34,6 @@ public class RagController {
     private final RagService ragService;
     private final IndexFaqService indexFaqService;
     private final HotelCacheService hotelCacheService;
-    private final PhoneLookupService phoneLookupService;
     private final KokCallMntrMapper mapper;
     private final QdrantProperties qdrant;
     private final RagProperties rag;
@@ -209,15 +207,6 @@ public class RagController {
             boolean added = hotelCacheService.addHotelIfAbsent(
                     str(body, "propCd"),  str(body, "propShrtNm"), str(body, "propFullNm"),
                     str(body, "cmpxCd"),  str(body, "cmpxNm"),     str(body, "cmpxReprTel"));
-            r.put("added", added);
-        });
-    }
-
-    /** 전화번호 → propCd 매핑 추가. */
-    @PostMapping("/phone-lookup/add")
-    public Map<String, Object> addPhoneLookup(@RequestBody Map<String, Object> body) {
-        return safeOp("phone_lookup 추가 실패", r -> {
-            boolean added = phoneLookupService.addIfAbsent(str(body, "phoneNo"), str(body, "propCd"));
             r.put("added", added);
         });
     }

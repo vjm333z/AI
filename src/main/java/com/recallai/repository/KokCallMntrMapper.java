@@ -18,7 +18,4 @@ public interface KokCallMntrMapper {
 
     /** 실패 재시도용 — seq_no 리스트로 원본 조회. 동일 필터 유지(데이터 변경 시 0건 반환). */
     List<KokCallMntrDto> selectBySeqNos(@Param("seqNos") Collection<Integer> seqNos);
-
-    /** phone_lookup용 — PROP_CD + REPORT만 조회 (연락처 파싱용). */
-    List<KokCallMntrDto> selectForPhoneLookup();
 }

@@ -27,8 +27,8 @@ from pathlib import Path
 
 from corrections import fix_company_name, WHISPER_INITIAL_PROMPT, DAOL_RECEIVER_NOS
 from hotel_matcher import (
-    load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
-    find_hotel_by_call_no, find_hotel_by_phone_lookup,
+    load_hotels, build_alias_pairs, fix_hotel_names,
+    find_hotel_by_call_no,
     find_hotel_from_text, find_cmpx_from_text, add_alias,
 )
 from db_utils import DB_DEFAULT, save_to_aia
@@ -641,14 +641,6 @@ def main():
         print(f"[호텔] {len(hotels)}개 호텔 로드 완료 "
               f"(aliases {sum(len(h.get('aliases', [])) for h in hotels)}개)")
 
-    # phone_lookup.json 로드
-    phone_lookup = {}
-    if hotels_path:
-        lookup_path  = str(Path(hotels_path).parent / "phone_lookup.json")
-        phone_lookup = load_phone_lookup(lookup_path)
-        if phone_lookup:
-            print(f"[전화] phone_lookup 로드 완료: {len(phone_lookup)}개 번호")
-
     # 결과 저장 경로
     if args.output:
         output_path = args.output
@@ -672,7 +664,7 @@ def main():
             seg["text"] = fix_hotel_names(seg["text"], alias_pairs)
         print("[호텔] STT 텍스트 호텔명 보정 완료")
 
-    # Step 2 — 요약 (phone lookup으로 알 수 있는 컨텍스트 미리 전달)
+    # Step 2 — 요약 (발/수신번호로 알 수 있는 컨텍스트 미리 전달)
     summary = None
     if not args.no_summary:
         pre_hotel, pre_cmpx = None, None
@@ -680,10 +672,6 @@ def main():
             pre_hotel, pre_cmpx = find_hotel_by_call_no(caller_no, hotels)
             if not pre_hotel:
                 pre_hotel, pre_cmpx = find_hotel_by_call_no(receiver_no, hotels)
-            if not pre_hotel and phone_lookup:
-                pre_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
-            if not pre_hotel and phone_lookup and receiver_no:
-                pre_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
         hotel_display = (pre_cmpx.get("cmpxNm") if pre_cmpx else None) or (pre_hotel.get("propShrtNm") if pre_hotel else None)
         summarize_ctx = {
             "caller_no":   caller_no,
@@ -699,7 +687,7 @@ def main():
     else:
         print("[요약] 스킵 (--no-summary)")
 
-    # Step 2.5 — 호텔 매칭 (수신번호 → phone_lookup → 텍스트)
+    # Step 2.5 — 호텔 매칭 (발/수신번호 → 텍스트)
     # 매칭 결과는 응답 JSON에만 포함. AIA 테이블에는 저장하지 않음 (화면에서 매핑).
     prop_cd, cmpx_cd = None, None
     if hotels:
@@ -718,18 +706,6 @@ def main():
                 cmpx_cd  = matched_cmpx.get("cmpxCd") if matched_cmpx else None
                 print(f"[호텔] 수신번호 매칭: {matched_hotel.get('propShrtNm')} "
                       f"(prop_cd={prop_cd}, cmpx_cd={cmpx_cd})")
-
-        if not matched_hotel and phone_lookup:
-            matched_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
-            if matched_hotel:
-                prop_cd = matched_hotel.get("propCd")
-                print(f"[호텔] phone_lookup 매칭(발신): {matched_hotel.get('propShrtNm')} (prop_cd={prop_cd})")
-
-        if not matched_hotel and phone_lookup and receiver_no:
-            matched_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
-            if matched_hotel:
-                prop_cd = matched_hotel.get("propCd")
-                print(f"[호텔] phone_lookup 매칭(수신): {matched_hotel.get('propShrtNm')} (prop_cd={prop_cd})")
 
         if not matched_hotel and summary and "error" not in summary:
             search_text = " ".join(filter(None, [

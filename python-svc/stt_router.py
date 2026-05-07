@@ -24,8 +24,8 @@ from transcribe_summarize import (
     _inject_caller_contact,
 )
 from hotel_matcher import (
-    load_hotels, load_phone_lookup, build_alias_pairs, fix_hotel_names,
-    find_hotel_by_call_no, find_hotel_by_phone_lookup,
+    load_hotels, build_alias_pairs, fix_hotel_names,
+    find_hotel_by_call_no,
     find_hotel_from_text, find_cmpx_from_text, add_alias,
 )
 from corrections import DAOL_RECEIVER_NOS
@@ -108,10 +108,6 @@ def _process_recording_inner(file_path: Path):
         hotels_path  = str(HOTELS_JSON) if HOTELS_JSON.exists() else None
         hotels       = load_hotels(hotels_path) if hotels_path else []
         alias_pairs  = build_alias_pairs(hotels)
-        phone_lookup = {}
-        if hotels_path:
-            lookup_path  = str(Path(hotels_path).parent / "phone_lookup.json")
-            phone_lookup = load_phone_lookup(lookup_path)
 
         # STT
         stt_result = transcribe_groq(audio_path)
@@ -129,15 +125,10 @@ def _process_recording_inner(file_path: Path):
             for seg in stt_result.get("segments", []):
                 seg["text"] = fix_hotel_names(seg["text"], alias_pairs)
 
-        # 요약 (phone lookup 기반 빠른 사전 매칭 후 컨텍스트 전달)
-        pre_hotel, pre_cmpx = None, None
+        # 요약 (발/수신번호 기반 빠른 사전 매칭 후 컨텍스트 전달)
         pre_hotel, pre_cmpx = find_hotel_by_call_no(caller_no, hotels)
         if not pre_hotel:
             pre_hotel, pre_cmpx = find_hotel_by_call_no(receiver_no, hotels)
-        if not pre_hotel and phone_lookup:
-            pre_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
-        if not pre_hotel and phone_lookup and receiver_no:
-            pre_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
         hotel_display = (pre_cmpx.get("cmpxNm") if pre_cmpx else None) or (pre_hotel.get("propShrtNm") if pre_hotel else None)
 
         summarize_ctx = {
@@ -183,16 +174,6 @@ def _process_recording_inner(file_path: Path):
             if matched_hotel:
                 prop_cd = matched_hotel.get("propCd")
                 cmpx_cd = matched_cmpx.get("cmpxCd") if matched_cmpx else None
-
-        if not matched_hotel and phone_lookup:
-            matched_hotel = find_hotel_by_phone_lookup(caller_no, phone_lookup, hotels)
-            if matched_hotel:
-                prop_cd = matched_hotel.get("propCd")
-
-        if not matched_hotel and phone_lookup and receiver_no:
-            matched_hotel = find_hotel_by_phone_lookup(receiver_no, phone_lookup, hotels)
-            if matched_hotel:
-                prop_cd = matched_hotel.get("propCd")
 
         if not matched_hotel and summary and "error" not in summary:
             search_text = " ".join(filter(None, [

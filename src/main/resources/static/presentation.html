@@ -425,10 +425,10 @@
   { "type": "divider", "title": "STT 파이프라인" },
 
   { "type": "user", "text": "STT는 어떻게 작동해요?" },
-  { "type": "assistant", "text": "통화 녹음 파일이 들어오면 **자동으로 전체 파이프라인**이 돌아요.\n\n① `POST /api/recording` — KT 콜봇이 mp3를 업로드\n② **Groq Whisper** — STT 변환 (세그먼트별 타임스탬프 포함)\n③ **Groq llama-3.3-70b** — 문의자·연락처·문의내역·카테고리 추출 + 요약\n④ **호텔 매칭** — 발신번호·수신번호·phone_lookup·텍스트 순서로 자동 매칭\n⑤ **AIA_CALL_RECORDING / TRANSCRIPT / ANALYSIS** — MariaDB 자동 저장\n\n중복 파일은 SHA256으로 감지해 자동 차단하고, `?force=true` 파라미터로 재처리도 가능해요." },
+  { "type": "assistant", "text": "통화 녹음 파일이 들어오면 **자동으로 전체 파이프라인**이 돌아요.\n\n① `POST /api/recording` — KT 콜봇이 mp3를 업로드\n② **Groq Whisper** — STT 변환 (세그먼트별 타임스탬프 포함)\n③ **Groq llama-3.3-70b** — 문의자·연락처·문의내역·카테고리 추출 + 요약\n④ **호텔 매칭** — 발신번호·수신번호·텍스트 순서로 자동 매칭\n⑤ **AIA_CALL_RECORDING / TRANSCRIPT / ANALYSIS** — MariaDB 자동 저장\n\n중복 파일은 SHA256으로 감지해 자동 차단하고, `?force=true` 파라미터로 재처리도 가능해요." },
 
   { "type": "user", "text": "호텔 매칭은 어떻게 해요?" },
-  { "type": "assistant", "text": "4단계 폴백 전략이에요.\n\n**1단계**: 발신번호·수신번호가 호텔 직통번호인지 확인 (`hotels.json`)\n**2단계**: `phone_lookup.json` — 과거 통화 이력 기반 번호-호텔 매핑\n**3단계**: STT 텍스트에서 호텔명·별칭 추출 (fuzzy matching)\n**4단계**: AIA DB 이전 통화 이력으로 보완\n\n매칭된 `prop_cd`·`cmpx_cd`는 DB에 저장돼서 RAG 검색 시 **호텔별 필터**로도 활용돼요." },
+  { "type": "assistant", "text": "3단계 폴백 전략이에요.\n\n**1단계**: 발신번호·수신번호가 호텔 직통번호인지 확인 (`hotels.json`)\n**2단계**: STT 텍스트에서 호텔명·별칭 추출 (fuzzy matching)\n**3단계**: AIA DB 이전 통화 이력으로 보완\n\n매칭된 `prop_cd`·`cmpx_cd`는 DB에 저장돼서 RAG 검색 시 **호텔별 필터**로도 활용돼요." },
 
   { "type": "divider", "title": "HyDE 하이브리드" },
 

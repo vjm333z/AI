@@ -14,15 +14,6 @@ def load_hotels(json_path: str) -> list:
         return []
 
 
-def load_phone_lookup(json_path: str) -> dict:
-    """phone_lookup.json 로드. {digits: prop_cd} 형태. 없으면 빈 dict."""
-    try:
-        with open(json_path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
 def build_alias_pairs(hotels: list) -> list:
     """alias → hotel 매핑 리스트 (긴 alias 우선 — 부분치환 오버랩 방지)."""
     pairs = []
@@ -122,17 +113,6 @@ def find_hotel_by_call_no(receiver_no: str, hotels: list) -> tuple:
                 if re.sub(r'\D', '', mobile) == normalized:
                     return h, c
     return None, None
-
-
-def find_hotel_by_phone_lookup(phone_no: str, lookup: dict, hotels: list):
-    """phone_lookup에서 전화번호 → prop_cd 조회 후 hotel 객체 반환."""
-    if not phone_no or not lookup or not hotels:
-        return None
-    digits = re.sub(r'\D', '', phone_no)
-    prop_cd = lookup.get(digits)
-    if not prop_cd:
-        return None
-    return next((h for h in hotels if h.get("propCd") == prop_cd), None)
 
 
 def find_cmpx_from_text(text: str, hotel: dict) -> dict:
