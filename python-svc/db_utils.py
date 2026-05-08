@@ -166,37 +166,57 @@ def save_to_aia(result: dict, db_cfg: dict) -> int:
                 MOD_DT         = CURRENT_TIMESTAMP
         """
 
-    conn = None
-    try:
-        conn = pymysql.connect(**db_cfg, charset="utf8mb4", autocommit=False)
-        with conn.cursor() as cur:
-            cur.execute(rec_sql, rec_row)
-            cur.execute(
-                "SELECT REC_SEQ_NO FROM AIA_CALL_RECORDING WHERE BASE_FILE_NM = %s",
-                (rec_row["base_file_nm"],),
-            )
-            row = cur.fetchone()
-            if not row:
-                raise RuntimeError("REC_SEQ_NO 조회 실패 — RECORDING UPSERT 직후")
-            rec_seq_no = row[0]
+    # MariaDB 측 일시 1045 (Access denied) 가 가끔 발생 — backoff 재시도로 통과 가능
+    import time as _time
+    last_err = None
+    for attempt in range(3):
+        conn = None
+        try:
+            conn = pymysql.connect(**db_cfg, charset="utf8mb4", autocommit=False)
+            with conn.cursor() as cur:
+                cur.execute(rec_sql, rec_row)
+                cur.execute(
+                    "SELECT REC_SEQ_NO FROM AIA_CALL_RECORDING WHERE BASE_FILE_NM = %s",
+                    (rec_row["base_file_nm"],),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise RuntimeError("REC_SEQ_NO 조회 실패 — RECORDING UPSERT 직후")
+                rec_seq_no = row[0]
 
-            cur.execute(trans_sql, dict(trans_row, rec_seq_no=rec_seq_no))
+                cur.execute(trans_sql, dict(trans_row, rec_seq_no=rec_seq_no))
 
-            if summary_ok:
-                cur.execute(analysis_sql, dict(analysis_row, rec_seq_no=rec_seq_no))
+                if summary_ok:
+                    cur.execute(analysis_sql, dict(analysis_row, rec_seq_no=rec_seq_no))
 
-        conn.commit()
-        action = "+ANALYSIS" if summary_ok else "STT only"
-        print(f"[DB] AIA UPSERT 완료 (REC_SEQ_NO={rec_seq_no}, {action})")
-        return rec_seq_no
-    except Exception as e:
-        if conn:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-        print(f"[DB] AIA UPSERT 실패: {e}")
-        return None
-    finally:
-        if conn:
-            conn.close()
+            conn.commit()
+            action = "+ANALYSIS" if summary_ok else "STT only"
+            tag = " (재시도 성공)" if attempt > 0 else ""
+            print(f"[DB] AIA UPSERT 완료 (REC_SEQ_NO={rec_seq_no}, {action}){tag}")
+            return rec_seq_no
+        except pymysql.err.OperationalError as e:
+            last_err = e
+            if conn:
+                try: conn.rollback()
+                except Exception: pass
+            # 1045 (인증 일시 거부) 만 재시도. 다른 OperationalError 는 바로 종료.
+            if e.args and e.args[0] == 1045 and attempt < 2:
+                wait = 2 ** attempt   # 1s → 2s → 4s
+                print(f"[DB] 1045 인증 일시 거부, {wait}s 후 재시도 ({attempt + 1}/3)")
+                _time.sleep(wait)
+                continue
+            print(f"[DB] AIA UPSERT 실패: {e}")
+            return None
+        except Exception as e:
+            if conn:
+                try: conn.rollback()
+                except Exception: pass
+            print(f"[DB] AIA UPSERT 실패: {e}")
+            return None
+        finally:
+            if conn:
+                try: conn.close()
+                except Exception: pass
+    # 3회 모두 1045
+    print(f"[DB] AIA UPSERT 실패 (3회 재시도 후): {last_err}")
+    return None

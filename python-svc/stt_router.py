@@ -116,6 +116,10 @@ def _process_recording_inner(file_path: Path):
         if summary and "error" not in summary and summary.get("report"):
             summary["report"] = _inject_caller_contact(summary["report"], caller_no, receiver_no)
 
+        # 발신측이 다올 비전이면 outbound 통화 — caller_nm 은 다올 직원일 가능성 높음. 무효화.
+        if summary and "error" not in summary and caller_no in DAOL_RECEIVER_NOS:
+            summary["caller_nm"] = None
+
         # 호텔 매칭 캐스케이드: 발신번호 → 수신번호 → 텍스트 fuzzy
         prop_cd, cmpx_cd, matched_hotel, matched_cmpx = None, None, None, None
 

@@ -257,7 +257,16 @@ SUMMARIZE_SYSTEM_PROMPT = """너는 호텔 PMS 상담 통화 모노 녹취록을
 4. STT 인식 오류 가능성 — 문맥으로 판단해 자연스럽게 정리. 단, 없는 내용은 지어내지 마.
 5. 불명확한 부분은 "미확인"으로.
 6. **system_cd, system_con, system_tp, urgency_cd, question, answer_given, summary 등 모든 분석 필드는 반드시 채워**. "(미확인)"은 정말 파악 안 될 때만 사용.
-7. question / answer_given 은 각각 **inquirer / responder 발화에 근거**해 작성."""
+7. question / answer_given 은 각각 **inquirer / responder 발화에 근거**해 작성.
+8. **caller_nm 추출 — 엄격히**:
+   - caller_nm = inquirer(발신측, 호텔 직원)가 *자기 자신을 소개한* 이름·직책. 다른 사람의 이름 절대 X.
+   - 자기소개 패턴에서만 추출:
+     "저는 X", "X 입니다", "X 이라고 합니다", "X인데요", "X예요"
+   - 호칭으로 부르는 이름은 caller_nm 아님:
+     "X 대리님~", "X 과장님께", "X 씨가~", "X 님이~", "어 X 님~" → 다른 사람을 부르는 거라 caller_nm 후보 X
+   - responder(다올 비전 측)가 자기를 소개한 이름은 caller_nm 절대 X.
+     (예: 통화 시작 "다올비전 X 입니다" → X는 다올 직원이지 호텔 직원 아님)
+   - 자기소개 패턴이 없거나 누가 누군지 불확실하면 caller_nm = "미확인" (추측 금지)."""
 
 
 def _inject_caller_contact(report: str, caller_no: str, receiver_no: str = None) -> str:
