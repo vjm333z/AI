@@ -39,11 +39,14 @@ public class IndexFaqService {
 
     /**
      * faq.json 읽어서 질문 임베딩 → Qdrant upsert (type=FAQ).
+     * inquiry / inquiry_templated 두 컬렉션 모두에 동일 vector·payload 저장 — FAQ는 이미 질문 형태라 HyDE 불필요.
      * 이미 적재된 FAQ도 덮어씌움 (faq_id 기반 고정 ID).
      */
     public String indexFaq() throws Exception {
         List<Map<String, Object>> faqs = loadFaqJson();
         log.info("FAQ 적재 시작: {}건", faqs.size());
+
+        String[] collections = { qdrantProps.getCollection(), qdrantProps.getCollectionTemplated() };
 
         int success = 0, fail = 0;
         for (Map<String, Object> faq : faqs) {
@@ -63,8 +66,10 @@ public class IndexFaqService {
                 payload.put("question", question);
                 payload.put("answer", answer);
 
-                qdrantService.upsertRawPoint(qdrantProps.getCollection(), pointId, vector, payload);
-                log.debug("FAQ upsert 완료: {} ({})", faqId, question);
+                for (String coll : collections) {
+                    qdrantService.upsertRawPoint(coll, pointId, vector, payload);
+                }
+                log.debug("FAQ upsert 완료 ({} 컬렉션): {} ({})", collections.length, faqId, question);
                 success++;
             } catch (Exception e) {
                 log.error("FAQ upsert 실패: {} — {}", faq.get("faq_id"), e.getMessage());
@@ -72,7 +77,7 @@ public class IndexFaqService {
             }
         }
 
-        String msg = String.format("FAQ 적재 완료 — 성공: %d, 실패: %d", success, fail);
+        String msg = String.format("FAQ 적재 완료 (%d 컬렉션) — 성공: %d, 실패: %d", collections.length, success, fail);
         log.info(msg);
         return msg;
     }

@@ -2,10 +2,12 @@
 """
 RecallAI Python 통합 서비스 — FastAPI 진입점.
 
-- /rerank          : bge-reranker-v2-m3 (CPU/GPU 인퍼런스)
-- /api/recording   : kt-call-bot 녹음 업로드 → STT → AIA_CALL_* 저장
-- /api/admin/*     : 운영 관리
-- /health          : 헬스체크 (reranker 모델 로드 상태 포함)
+- /rerank   : bge-reranker-v2-m3 (CPU/GPU 인퍼런스)
+- /stt      : 공유 볼륨에 저장된 음성 파일을 Whisper로 전사 (Spring 메인앱이 호출)
+- /health   : 헬스체크 (reranker 모델 로드 상태 포함)
+
+업로드·DB 저장·호텔 매칭·요약·파일 라이프사이클은 모두 Spring 메인앱(:8080)이 책임.
+이 서비스는 GPU/모델 워크로드(reranker, Whisper)만 처리.
 
 기동:
     uvicorn main:app --host 0.0.0.0 --port 8000

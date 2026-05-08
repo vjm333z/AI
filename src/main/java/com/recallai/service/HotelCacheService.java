@@ -178,4 +178,31 @@ public class HotelCacheService {
                 .writeValue(path.toFile(), new ArrayList<>(hotelMap.values()));
         log.info("hotels.json 저장 완료: {}", path.toAbsolutePath());
     }
+
+    /**
+     * 호텔에 새 별칭(STT 오인식 후보) 추가. 이미 있으면 스킵.
+     * 호출자: 통화 텍스트 fuzzy 매칭이 성공한 직후, 그 후보를 다음 통화에 즉시 적용 가능하게 학습.
+     *
+     * @return true=추가됨, false=호텔 없음/이미 존재/공백
+     */
+    public synchronized boolean addAlias(String propCd, String alias) {
+        if (propCd == null || alias == null) return false;
+        String trimmed = alias.trim();
+        if (trimmed.isEmpty()) return false;
+        HotelDto h = hotelMap.get(propCd);
+        if (h == null) return false;
+        List<String> aliases = h.getAliases();
+        if (aliases.contains(trimmed)) return false;
+        aliases.add(trimmed);
+        try {
+            saveToFile();
+            log.info("호텔 alias 추가: propCd={} ← '{}'", propCd, trimmed);
+            return true;
+        } catch (Exception e) {
+            // 저장 실패 시 in-memory 상태도 롤백
+            aliases.remove(trimmed);
+            log.warn("alias 저장 실패: {}", e.getMessage());
+            return false;
+        }
+    }
 }

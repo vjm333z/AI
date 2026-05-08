@@ -26,28 +26,19 @@ services:
     build: ./python-svc
     container_name: python-svc
     ports:
-      - "8000:8000"      # /rerank, /api/recording, /api/admin/*, /health
+      - "8000:8000"      # /rerank, /stt, /health
     environment:
       PYTHONUNBUFFERED: "1"
       # Reranker
       RERANKER_MODEL: BAAI/bge-reranker-v2-m3
       RERANKER_FP16: "true"
-      # STT — Groq + 요약 LLM (provider: openai | groq)
+      # STT — Groq Whisper API only. 요약·DB 저장·호텔 매칭은 Spring(:8080)이 책임.
       GROQ_STT_API_KEY: ${GROQ_STT_API_KEY:-${GROQ_API_KEY}}
-      GROQ_LLM_API_KEY: ${GROQ_LLM_API_KEY:-${GROQ_API_KEY}}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
-      # AIA DB (운영 PMS DB) — 모든 값은 .env에서 주입
-      DB_HOST: ${STT_DB_HOST}
-      DB_PORT: ${STT_DB_PORT:-3306}
-      DB_USER: ${STT_DB_USER}
-      DB_PASSWORD: ${STT_DB_PASSWORD}
-      DB_NAME: ${STT_DB_NAME:-PMS}
+      # 공유 볼륨 루트 — Spring(/app/data)와 동일. /stt가 relative_path를 이 기준으로 해석.
+      DATA_DIR: /app/data
     volumes:
       - reranker_cache:/root/.cache/huggingface
-      - stt_inbox:/app/inbox
-      - stt_recordings:/app/recordings
-      - stt_results:/app/results
+      - app_data:/app/data        # ★ 메인앱과 공유 — 녹음 파일은 여기 한 곳에만 저장됨
     restart: unless-stopped
 
   app:
@@ -61,9 +52,16 @@ services:
       QDRANT_URL: http://qdrant:6333
       RERANKER_URL: http://python-svc:8000   # 단일 통합 서비스로 변경
       RAG_DATA_DIR: /app/data
+      # 메인 PMS DB (host 178) — KOK_CALL_MNTR / 호텔 마스터 조회용
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      # AIA_CALL_* 쓰기 전용 DB (host 191). AiaDataSourceConfig 가 별도 DataSource로 사용.
+      STT_DB_HOST: ${STT_DB_HOST}
+      STT_DB_PORT: ${STT_DB_PORT:-3306}
+      STT_DB_USER: ${STT_DB_USER}
+      STT_DB_PASSWORD: ${STT_DB_PASSWORD}
+      STT_DB_NAME: ${STT_DB_NAME:-PMS}
       GROQ_API_KEY: ${GROQ_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       RAG_RERANKER_MIN_SCORE: "0.6"
@@ -90,8 +88,5 @@ volumes:
   qdrant_storage:
   ollama_models:
   reranker_cache:
-  app_data:
+  app_data:                # 메인앱·python-svc 공유 (녹음 파일 + RAG 데이터)
   portainer_data:
-  stt_inbox:
-  stt_recordings:
-  stt_results:

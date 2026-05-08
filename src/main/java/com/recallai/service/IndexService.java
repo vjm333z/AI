@@ -223,27 +223,18 @@ public class IndexService {
                 failureTracker.removeSuccessful(missingSeqs);
             }
 
-            int ok = 0, fail = 0, skipEmpty = 0;
-            Set<Integer> successSeqs = new HashSet<>();
+            TemplatizeService templatizer = getTemplatizer();
+            int ok = 0, fail = 0;
             for (KokCallMntrDto dto : rows) {
-                String text = dto.toEmbeddingText();
-                if (text.isEmpty()) {
-                    skipEmpty++;
-                    continue;
-                }
-                try {
-                    List<Double> vector = ollamaService.embed(buildEmbText(dto));
-                    qdrantService.upsertTo(qdrantService.getDefaultCollection(), dto.getSeqNo(), vector, dto, buildHotelPayload(dto));
+                if (indexOneTemplated(dto, templatizer)) {
                     ok++;
-                    successSeqs.add(dto.getSeqNo());
                     log.info("Retry OK seq_no={}", dto.getSeqNo());
-                } catch (Exception e) {
+                } else {
                     fail++;
-                    log.warn("Retry 실패 seq_no={}, cause={}", dto.getSeqNo(), e.getMessage());
-                    failureTracker.record(dto.getSeqNo(), "retry: " + e.getMessage());
                 }
+                try { Thread.sleep(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             }
-            failureTracker.removeSuccessful(successSeqs);
+            // indexOneTemplated 가 성공/실패별로 failureTracker 를 알아서 갱신함
 
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("success", true);
@@ -251,10 +242,9 @@ public class IndexService {
             r.put("retried", rows.size());
             r.put("ok", ok);
             r.put("fail", fail);
-            r.put("skip_empty", skipEmpty);
             r.put("removed_missing", missingSeqs.size());
             r.put("pending_after", failureTracker.distinctSeqNos().size());
-            log.info("재시도 완료: {}", r);
+            log.info("재시도 완료 (templated, provider={}): {}", templatizer.providerName(), r);
             return r;
         } finally {
             indexing.set(false);
@@ -281,35 +271,31 @@ public class IndexService {
     }
 
     /**
-     * KOK_CALL_MNTR 등록 직후 단건 즉시 Qdrant 인덱싱.
-     * 실패 시 failed_index.txt에 자동 기록 → 스케줄러의 retryFailed가 다음 실행에서 자동 복구.
+     * KOK_CALL_MNTR 등록 직후 단건 즉시 Qdrant 인덱싱 (templated 경로).
+     * templatize → core_question+situation 임베딩 → {@code inquiry_templated} 업서트.
+     * 실패 시 failed_index.txt에 자동 기록 → retryFailed가 다음 실행에서 자동 복구.
      */
     public void indexSingle(KokCallMntrDto dto) throws Exception {
-        String text = dto.toEmbeddingText();
-        if (text.isEmpty()) {
-            log.warn("indexSingle 스킵 — 빈 본문 seq_no={}", dto.getSeqNo());
-            return;
+        TemplatizeService templatizer = getTemplatizer();
+        if (!indexOneTemplated(dto, templatizer)) {
+            throw new RuntimeException("indexSingle 실패 seq_no=" + dto.getSeqNo()
+                    + " — failed_index.txt 에 기록됨, retry-failed 로 복구 가능");
         }
-        try {
-            List<Double> vector = ollamaService.embed(buildEmbText(dto));
-            qdrantService.upsertTo(qdrantService.getDefaultCollection(), dto.getSeqNo(), vector, dto, buildHotelPayload(dto));
-            // 이전 실패 기록이 있었다면 정리 (자가 치유)
-            failureTracker.removeSuccessful(Collections.singleton(dto.getSeqNo()));
-            log.info("indexSingle 완료 seq_no={}", dto.getSeqNo());
-        } catch (Exception e) {
-            failureTracker.record(dto.getSeqNo(), e.getMessage());
-            log.warn("indexSingle 실패, failed_index.txt 기록 seq_no={}, cause={}",
-                    dto.getSeqNo(), e.getMessage());
-            throw e;
-        }
+        log.info("indexSingle 완료 seq_no={} (templated, provider={})",
+                dto.getSeqNo(), templatizer.providerName());
     }
 
+    /**
+     * 증분 적재 — last_sync.txt 이후 신규 KOK_CALL_MNTR을 templated 경로로 업서트.
+     * Groq rate limit 보호용 호출 사이 sleep 500ms (indexAllTemplated와 동일).
+     */
     public String indexUpdated() throws Exception {
         if (!indexing.compareAndSet(false, true)) {
             log.warn("indexUpdated 호출됐지만 이미 다른 적재 작업이 진행 중");
             return "이미 적재 작업이 진행 중입니다";
         }
         try {
+            TemplatizeService templatizer = getTemplatizer();
             String lastSyncDt = readLastSyncDt();
             List<KokCallMntrDto> list = mapper.selectAfter(lastSyncDt);
 
@@ -320,31 +306,77 @@ public class IndexService {
                 if (dto.getRDt() != null && (maxRDt == null || dto.getRDt().compareTo(maxRDt) > 0)) {
                     maxRDt = dto.getRDt();
                 }
-                String text = dto.toEmbeddingText();
-                if (text.isEmpty()) continue;
-                try {
-                    List<Double> vector = ollamaService.embed(buildEmbText(dto));
-                    qdrantService.upsertTo(qdrantService.getDefaultCollection(), dto.getSeqNo(), vector, dto, buildHotelPayload(dto));
-                    ok++;
-                } catch (Exception e) {
-                    fail++;
-                    log.warn("증분 적재 실패 seq_no={}, cause={}", dto.getSeqNo(), e.getMessage());
-                }
+                if (indexOneTemplated(dto, templatizer)) ok++; else fail++;
+                try { Thread.sleep(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             }
 
             // 조회된 데이터가 있을 때만 커서 갱신. 0건이면 이전 커서 유지 → 다음 실행에서 재조회 가능.
             if (maxRDt != null) {
                 saveLastSyncDt(maxRDt);
-                log.info("last_sync 커서 갱신: {} → {} (fetched={}, ok={}, fail={})",
-                        lastSyncDt, maxRDt, list.size(), ok, fail);
+                log.info("last_sync 커서 갱신: {} → {} (fetched={}, ok={}, fail={}, provider={})",
+                        lastSyncDt, maxRDt, list.size(), ok, fail, templatizer.providerName());
             } else {
                 log.info("신규 데이터 0건, 커서 유지: {}", lastSyncDt);
             }
-            return String.format("추가 완료: 성공 %d건, 실패 %d건 (cursor=%s)",
+            return String.format("templated 증분 적재 완료: 성공 %d건, 실패 %d건 (cursor=%s)",
                     ok, fail, maxRDt != null ? maxRDt : lastSyncDt);
         } finally {
             indexing.set(false);
         }
+    }
+
+    /**
+     * 단일 레코드를 templated 경로로 적재 — single/updated/retry 공통.
+     * <ol>
+     *   <li>templatize → core_question/situation/cause/solution JSON 추출</li>
+     *   <li>core_question + situation 를 임베딩 (HyDE 검색 친화)</li>
+     *   <li>{@code inquiry_templated} 컬렉션에 hyde + 호텔 payload 병합 저장</li>
+     * </ol>
+     * 어느 단계든 실패하면 {@code failed_index.txt} 에 기록하고 false 반환. 성공 시 기존 실패 기록 정리.
+     */
+    private boolean indexOneTemplated(KokCallMntrDto dto, TemplatizeService templatizer) {
+        String rawReport = dto.getReport();
+        if (rawReport == null || rawReport.trim().isEmpty()) {
+            log.warn("templated 스킵 — 빈 본문 seq_no={}", dto.getSeqNo());
+            return false;
+        }
+        Map<String, Object> hyde = templatizer.templatize(rawReport, dto.getFeedback());
+        if (hyde == null) {
+            failureTracker.record(dto.getSeqNo(), "templatize 실패: " + templatizer.providerName());
+            log.warn("templatize 실패 seq_no={}, provider={}", dto.getSeqNo(), templatizer.providerName());
+            return false;
+        }
+        String coreQ = String.valueOf(hyde.getOrDefault("core_question", "")).trim();
+        String situation = String.valueOf(hyde.getOrDefault("situation", "")).trim();
+        String embText = (coreQ + " " + situation).trim();
+        if (embText.isEmpty()) {
+            failureTracker.record(dto.getSeqNo(), "빈 core_question+situation");
+            return false;
+        }
+        try {
+            // hyde 4필드 + 호텔 표시명(prop_shrt_nm/cmpx_nm) 모두 payload에 보존
+            Map<String, Object> extras = new HashMap<>(hyde);
+            extras.putAll(buildHotelPayload(dto));
+            List<Double> vector = ollamaService.embed(embText);
+            qdrantService.upsertTo(qdrantService.getTemplatedCollection(), dto.getSeqNo(), vector, dto, extras);
+            failureTracker.removeSuccessful(Collections.singleton(dto.getSeqNo()));
+            return true;
+        } catch (Exception e) {
+            failureTracker.record(dto.getSeqNo(), "templated upsert: " + e.getMessage());
+            log.warn("templated upsert 실패 seq_no={}, cause={}", dto.getSeqNo(), e.getMessage());
+            return false;
+        }
+    }
+
+    /** 현재 설정된 templatize provider 의 빈 조회. 없으면 즉시 예외. */
+    private TemplatizeService getTemplatizer() {
+        String provider = props.getTemplatize().getProvider();
+        TemplatizeService t = templatizers.get(provider);
+        if (t == null) {
+            throw new IllegalStateException("Unknown templatize provider='" + provider
+                    + "'. 사용 가능: " + templatizers.keySet());
+        }
+        return t;
     }
 
     /** 호텔명 접두어 포함한 임베딩 텍스트 생성. 호텔명 없으면 원본 그대로. */

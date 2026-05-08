@@ -3,12 +3,24 @@ server:
 
 spring:
   datasource:
+    # 메인 PMS (운영 DB, host 178) — 읽기 전용. KOK_CALL_MNTR / PMS_PROPERTY / PMS_COMPLEX 조회용.
     driver-class-name: org.mariadb.jdbc.Driver
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
       initialization-fail-timeout: -1                 # DB 못붙어도 앱 시동되게 (lazy connect)
+
+# AIA_CALL_* 쓰기 전용 DB (host 191) — STT 결과 저장용.
+# 메인 DB와 호스트가 달라 별도 DataSource 필요. 자세한 빈 구성은 AiaDataSourceConfig 참조.
+aia:
+  datasource:
+    driver-class-name: org.mariadb.jdbc.Driver
+    url: jdbc:mariadb://${STT_DB_HOST}:${STT_DB_PORT:3306}/${STT_DB_NAME:PMS}
+    username: ${STT_DB_USER}
+    password: ${STT_DB_PASSWORD}
+    hikari:
+      initialization-fail-timeout: -1
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -42,7 +54,7 @@ qdrant:
 rag:
   data-dir: ${RAG_DATA_DIR:data}      # hotels.json / last_sync.txt / failed_index.txt 저장 경로
   templatize:
-    provider: groq         # HyDE 적재에 사용할 LLM provider. 현재 구현체: groq
+    provider: groq         # HyDE 적재에 사용할 LLM provider. 구현체: groq | openai
   search:
     top-k: 10              # Qdrant에서 꺼낼 후보 수 (reranker 대비 넉넉히)
     final-top-k: 4         # 최종 LLM에 넘길 문서 수
@@ -50,7 +62,7 @@ rag:
     faq-score-threshold: 0.60  # FAQ 전용 하한
   reranker:
     enabled: true          # Python FastAPI reranker 서비스 기동 완료 시 true
-    url: ${RERANKER_URL:http://localhost:8000}
+    url: ${PYTHON_SVC_URL:${RERANKER_URL:http://localhost:8000}}
     timeout-ms: 20000
     min-score: 0.6         # rerank_score 컷 — 0.5 근처는 "무관" 신호. 이 아래면 사례에서 제외
   dedup:
@@ -77,3 +89,30 @@ openai:
   model: gpt-4o-mini
   url: https://api.openai.com/v1/chat/completions
   timeout-ms: 30000
+
+# 통화 녹음 STT 파이프라인
+recording:
+  # 녹음 파일 라이프사이클이 저장될 루트 (data-dir 하위)
+  #   - inbox/      : 업로드 직후 (처리 대기)
+  #   - done/       : STT/요약/DB 저장 완료
+  #   - results/    : 결과 JSON·MD 사본
+  base-dir: recordings
+  # python-svc /stt 호출 직전·직후 동시성 제어 (Groq Whisper 동시 호출 방지)
+  process-lock-enabled: true
+  # 3초 미만 통화는 STT 후 자동 스킵 (잡음·오발신 등)
+  min-duration-sec: 3
+  # 요약 LLM provider — groq | openai (실패 시 자동 폴백)
+  summarize-provider: groq
+  # 다올 비전 수신번호 (이 번호 = 자사 측, 연락처 자동 주입 시 제외)
+  daol-receiver-nos:
+    - "07077108705"
+    - "07077108706"
+    - "07077108707"
+    - "07077108708"
+    - "07077103553"
+    - "07077100878"
+
+# python-svc /stt 클라이언트 설정 (메인앱 → python-svc 호출용)
+stt:
+  url: ${PYTHON_SVC_URL:${RERANKER_URL:http://localhost:8000}}
+  timeout-ms: 180000      # 5분 통화 STT는 보통 10~30초, 안전 마진
