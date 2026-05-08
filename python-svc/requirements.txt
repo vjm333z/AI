@@ -1,14 +1,21 @@
-# RecallAI Python 통합 서비스 — reranker + STT 전용 슬림 의존성
+# RecallAI Python 통합 서비스 — reranker + STT
 # torch CPU 버전은 Dockerfile에서 별도 설치 (이미지 크기 ~1.2GB 절약)
 
 # Web framework
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 pydantic==2.9.2
+python-multipart>=0.0.9      # UploadFile 의존성
 
 # Reranker
 sentence-transformers==3.3.1
 # torch는 Dockerfile에서 CPU 빌드로 별도 설치
 
-# STT — Groq Whisper API 호출
+# STT — Groq API + 로컬 폴백
+faster-whisper>=1.0.0        # --stt-provider=local 일 때만 사용
 requests>=2.31.0
+pydub>=0.25.1                # 오디오 후처리 (옵셔널)
+pynacl>=1.5.0                # kt-call-bot 검증용 (옵셔널)
+
+# DB
+pymysql>=1.1.0
